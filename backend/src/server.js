@@ -3,8 +3,22 @@ import dotenv from "dotenv";
 import http from "http";
 import cors from "cors";
 import { Server } from "socket.io";
-
+import path from "path";
+import fs from "fs";
+import job from "./lib/cron.js";
 dotenv.config();
+
+const publicDir = path.join(process.cwd(), "public");
+// if the public directory exists, serve the static files
+// this is for the production build
+if (fs.existsSync(publicDir)) {
+    app.use(express.static(publicDir));
+
+    app.get("/{*any}", (req, res, next) => {
+        res.sendFile(path.join(publicDir, "index.html"), (err) => next(err));
+    });
+}
+
 const app = express();
 app.use(cors());
 const server = http.createServer(app);
@@ -33,4 +47,5 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    if (process.env.NODE_ENV === "production") job.start();
 });
