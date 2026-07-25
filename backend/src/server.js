@@ -7,6 +7,7 @@ import path from "path";
 import fs from "fs";
 import job from "./lib/cron.js";
 dotenv.config();
+const app = express();
 
 const publicDir = path.join(process.cwd(), "public");
 // if the public directory exists, serve the static files
@@ -19,7 +20,6 @@ if (fs.existsSync(publicDir)) {
     });
 }
 
-const app = express();
 app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
