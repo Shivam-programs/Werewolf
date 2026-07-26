@@ -28,8 +28,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/games", gameRoutes);
 
 const publicDir = path.join(process.cwd(), "public");
-// if the public directory exists, serve the static files
-// this is for the production build
+
 if (fs.existsSync(publicDir)) {
     app.use(express.static(publicDir));
 
