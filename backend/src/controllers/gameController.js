@@ -1,0 +1,1170 @@
+import {roles} from "../models/roles.js";
+import { io } from "../lib/socket.js"; // adjust path if needed
+
+
+const MAX_PLAYERS = 7;
+
+const PHASES = {
+    WAITING: "waiting",
+    NIGHT: "night",
+    DAY: "day",
+    VOTING: "voting",
+    ENDED: "ended",
+};
+
+const NIGHT_DURATION = 60 * 1000;
+const DAY_DURATION = 60 * 1000;
+const VOTING_DURATION = 30 * 1000;
+
+function getRoom(roomCode) {
+    return rooms[roomCode] || null;
+}
+function getPlayer(room, playerName) {
+    return room.players.find(
+        (player) => player.name === playerName
+    );
+}
+function getPlayerBySocket(room, socketId) {
+    return room.players.find(
+        (player) => player.socketId === socketId
+    );
+}
+function getAlivePlayer(room, playerName) {
+    return room.players.find(
+        (player) =>
+            player.name === playerName &&
+            player.alive
+    );
+}
+function isNight(room) {
+    return room.phase === PHASES.NIGHT;
+}
+function isDay(room) {
+    return room.phase === PHASES.DAY;
+}
+function isVoting(room) {
+    return room.phase === PHASES.VOTING;
+}
+
+function isWaiting(room) {
+    return room.phase === PHASES.WAITING;
+}
+
+function isWerewolf(player) {
+    return player.role === "Werewolf";
+}
+
+function isKnight(player) {
+    return player.role === "Knight";
+}
+
+function isSeer(player) {
+    return player.role === "Seer";
+}
+
+function clearRoomTimer(room) {
+    if (!room.timer) return;
+
+    clearTimeout(room.timer);
+    room.timer = null;
+}
+
+function emitPhase(roomCode, room) {
+    io.to(roomCode).emit("phaseChanged", {
+        phase: room.phase,
+        day: room.day,
+        endsAt: room.phaseEndTime,
+    });
+}
+
+function validateGameRunning(room) {
+    if (!room.started) {
+        return {
+            success: false,
+            message: "Game has not started.",
+        };
+    }
+
+    return { success: true };
+}
+
+function validateAlive(player) {
+    if (!player.alive) {
+        return {
+            success: false,
+            message: "Dead players cannot perform actions.",
+        };
+    }
+
+    return {
+        success: true,
+    };
+}
+
+function validateTarget(room, actorName, targetName) {
+
+    if (actorName === targetName) {
+        return {
+            success: false,
+            message: "You cannot target yourself.",
+        };
+    }
+
+    const target = getAlivePlayer(room, targetName);
+
+    if (!target) {
+        return {
+            success: false,
+            message: "Target must be alive.",
+        };
+    }
+
+    return {
+        success: true,
+        target,
+    };
+}
+
+function validatePhase(room, phase) {
+
+    if (room.phase !== phase) {
+
+        return {
+            success: false,
+            message: `Action allowed only during ${phase}.`,
+        };
+    }
+
+    return {
+        success: true,
+    };
+}
+
+function validateRole(player, role) {
+
+    if (player.role !== role) {
+
+        return {
+            success: false,
+            message: `Only ${role} can perform this action.`,
+        };
+    }
+
+    return {
+        success: true,
+    };
+}
+
+function assignRoles(room) {
+
+    const shuffledRoles = [...roles];
+
+    for (
+        let i = shuffledRoles.length - 1;
+        i > 0;
+        i--
+    ) {
+
+        const j = Math.floor(
+            Math.random() * (i + 1)
+        );
+
+        [shuffledRoles[i], shuffledRoles[j]] = [
+            shuffledRoles[j],
+            shuffledRoles[i],
+        ];
+    }
+
+    room.players.forEach((player, index) => {
+
+        player.role = shuffledRoles[index];
+
+    });
+}
+
+function sendRoles(roomCode, room) {
+
+    room.players.forEach((player) => {
+
+        const socket = io.sockets.sockets.get(player.socketId);
+
+        if (!socket) return;
+
+        const data = {
+            role: player.role,
+        };
+
+        if (player.role === "Werewolf") {
+
+            data.teammates = room.players
+                .filter(
+                    (p) =>
+                        p.role === "Werewolf" &&
+                        p.name !== player.name
+                )
+                .map((p) => p.name);
+
+        }
+
+        socket.emit("roleAssigned", data);
+
+    });
+
+}
+
+function createRoom(playerName) {
+    return {
+        host: playerName,
+
+        started: false,
+
+        phase: PHASES.WAITING,
+
+        phaseEndTime: null,
+
+        timer: null,
+
+        day: 0,
+
+        players: [
+            {
+                name: playerName,
+
+                socketId: null,
+
+                alive: true,
+
+                connected: true,
+
+                ready: false,
+
+                role: null,
+            },
+        ],
+
+        publicMessages: [],
+
+        werewolfMessages: [],
+
+        publicVotes: {},
+
+        werewolfVotes: {},
+
+        // Night actions (reset every night)
+        seerAction: null,
+
+        knightAction: null,
+
+        werewolfTarget: null,
+    };
+}
+
+export async function createGame(req, res) {
+    try {
+
+        const { roomCode, playerName } = req.body;
+
+        if (!roomCode || !playerName) {
+            return res.status(400).json({
+                message: "Room code and player name are required.",
+            });
+        }
+
+        const trimmedName = playerName.trim();
+
+        if (rooms[roomCode]) {
+            return res.status(400).json({
+                message: "Room already exists.",
+            });
+        }
+
+        rooms[roomCode] = createRoom(trimmedName);
+
+        return res.status(201).json({
+            success: true,
+
+            roomCode,
+
+            room: rooms[roomCode],
+        });
+
+    } catch (err) {
+
+        return res.status(500).json({
+            success: false,
+
+            message: err.message,
+        });
+
+    }
+}
+
+export async function joinGame(req, res) {
+
+    try {
+
+        const { roomCode } = req.params;
+
+        const { playerName } = req.body;
+
+        const room = getRoom(roomCode);
+
+        if (!room) {
+            return res.status(404).json({
+                message: "Room not found.",
+            });
+        }
+
+        if (room.started) {
+            return res.status(400).json({
+                message: "Game already started.",
+            });
+        }
+
+        if (room.players.length >= MAX_PLAYERS) {
+            return res.status(400).json({
+                message: "Room is full.",
+            });
+        }
+
+        const trimmedName = playerName.trim();
+
+        if (
+            room.players.some(
+                player =>
+                    player.name === trimmedName
+            )
+        ) {
+            return res.status(400).json({
+                message: "Player already exists.",
+            });
+        }
+
+        room.players.push({
+
+            name: trimmedName,
+
+            socketId: null,
+
+            connected: true,
+
+            alive: true,
+
+            ready: false,
+
+            role: null,
+
+        });
+
+        io.to(roomCode).emit(
+            "playerJoined",
+            room.players
+        );
+
+        return res.status(200).json({
+
+            success: true,
+
+            room,
+
+        });
+
+    } catch (err) {
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: err.message,
+
+        });
+
+    }
+
+}
+
+export function startGame(roomCode, socketId) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) {
+        return {
+            success: false,
+            message: "Room not found.",
+        };
+    }
+
+    const host = getPlayerBySocket(room, socketId);
+
+    if (!host) {
+        return {
+            success: false,
+            message: "Player not found.",
+        };
+    }
+
+    if (room.host !== host.name) {
+        return {
+            success: false,
+            message: "Only the host can start the game.",
+        };
+    }
+
+    if (room.started) { 
+        return {
+            success: false,
+            message: "Game already started.",
+        };
+    }
+
+    if (room.players.length !== MAX_PLAYERS) {
+        return {
+            success: false,
+            message: `Exactly ${MAX_PLAYERS} players required.`,
+        };
+    }
+
+    assignRoles(room);
+
+    room.started = true;
+
+    // First night will increment this to Day 1
+    room.day = 0;
+
+    sendRoles(roomCode, room);
+
+    startNight(roomCode);
+
+    return {
+        success: true,
+        message: "Game started.",
+    };
+
+}
+
+function startNight(roomCode) {
+
+    const room = getRoom(roomCode);
+
+    if (!room || !room.started) return;
+
+    clearRoomTimer(room);
+
+    room.day++;
+
+    room.phase = PHASES.NIGHT;
+
+    room.phaseEndTime = Date.now() + NIGHT_DURATION;
+
+    room.publicVotes = {};
+
+    room.werewolfVotes = {};
+
+    room.nightActions = {
+        werewolfTarget: null,
+        knightProtect: null,
+    };
+
+    emitPhase(roomCode, room);
+
+    room.timer = setTimeout(() => {
+        resolveNightActions(roomCode);
+    }, NIGHT_DURATION);
+
+}
+function resolveNightActions(roomCode) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) return;
+
+    let eliminatedPlayer = null;
+
+    const target = getAlivePlayer(
+        room,
+        room.nightActions.werewolfTarget
+    );
+
+    const protectedPlayer = getAlivePlayer(
+        room,
+        room.nightActions.knightProtect
+    );
+
+    if (
+        target &&
+        (
+            !protectedPlayer ||
+            target.name !== protectedPlayer.name
+        )
+    ) {
+
+        target.alive = false;
+
+        eliminatedPlayer = target.name;
+
+    }
+
+    room.nightActions = {
+        werewolfTarget: null,
+        knightProtect: null,
+    };
+
+    io.to(roomCode).emit(
+        "nightEnded",
+        {
+            eliminatedPlayer,
+            players: room.players,
+        }
+    );
+
+    if (checkGameOver(roomCode)) {
+        return;
+    }
+
+    startDay(roomCode);
+
+}
+function startDay(roomCode) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) return;
+
+    clearRoomTimer(room);
+
+    room.phase = PHASES.DAY;
+
+    room.phaseEndTime =
+        Date.now() + DAY_DURATION;
+
+    emitPhase(roomCode, room);
+
+    room.timer = setTimeout(() => {
+
+        startVoting(roomCode);
+
+    }, DAY_DURATION);
+
+}
+function startVoting(roomCode) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) return;
+
+    clearRoomTimer(room);
+
+    room.phase = PHASES.VOTING;
+
+    room.publicVotes = {};
+
+    room.phaseEndTime =
+        Date.now() + VOTING_DURATION;
+
+    emitPhase(roomCode, room);
+
+    room.timer = setTimeout(() => {
+
+        endVoting(roomCode);
+
+    }, VOTING_DURATION);
+
+}
+function endVoting(roomCode) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) return;
+
+    clearRoomTimer(room);
+
+    const counts = {};
+
+    Object.values(room.publicVotes)
+        .forEach(target => {
+
+            counts[target] =
+                (counts[target] || 0) + 1;
+
+        });
+
+    let eliminatedPlayer = null;
+
+    let highestVotes = 0;
+
+    let tie = false;
+
+    for (const player in counts) {
+
+        if (counts[player] > highestVotes) {
+
+            highestVotes = counts[player];
+
+            eliminatedPlayer = player;
+
+            tie = false;
+
+        }
+
+        else if (
+            counts[player] === highestVotes
+        ) {
+
+            tie = true;
+
+        }
+
+    }
+
+    if (
+        eliminatedPlayer &&
+        !tie
+    ) {
+
+        const target =
+            getAlivePlayer(
+                room,
+                eliminatedPlayer
+            );
+
+        if (target) {
+
+            target.alive = false;
+
+        }
+
+    }
+
+    else {
+
+        eliminatedPlayer = null;
+
+    }
+
+    room.publicVotes = {};
+
+    io.to(roomCode).emit(
+        "votingEnded",
+        {
+            eliminatedPlayer,
+            players: room.players,
+        }
+    );
+
+    if (checkGameOver(roomCode)) {
+
+        return;
+
+    }
+
+    startNight(roomCode);
+
+}
+function checkGameOver(roomCode) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) return false;
+
+    const alivePlayers =
+        room.players.filter(
+            player => player.alive
+        );
+
+    const aliveWerewolves =
+        alivePlayers.filter(
+            player =>
+                player.role === "Werewolf"
+        ).length;
+
+    const aliveVillagers =
+        alivePlayers.length -
+        aliveWerewolves;
+
+    let winner = null;
+
+    if (
+        aliveWerewolves === 0
+    ) {
+
+        winner = "Villagers";
+
+    }
+
+    else if (
+        aliveWerewolves >=
+        aliveVillagers
+    ) {
+
+        winner = "Werewolves";
+
+    }
+
+    if (!winner) {
+
+        return false;
+
+    }
+
+    clearRoomTimer(room);
+
+    room.started = false;
+
+    room.phase = PHASES.ENDED;
+
+    room.phaseEndTime = null;
+
+    io.to(roomCode).emit(
+        "gameEnded",
+        {
+
+            winner,
+
+            players: room.players,
+
+        }
+    );
+
+    return true;
+
+}
+export function publicVote(roomCode, socketId, targetName) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) {
+        return {
+            success: false,
+            message: "Room not found.",
+        };
+    }
+
+    let validation = validateGameRunning(room);
+
+    if (!validation.success) return validation;
+
+    validation = validatePhase(room, PHASES.VOTING);
+
+    if (!validation.success) return validation;
+
+    // Find voter using socket.id
+    const voter = room.players.find(
+        (player) => player.socketId === socketId
+    );
+
+    if (!voter) {
+        return {
+            success: false,
+            message: "Player not found.",
+        };
+    }
+
+    validation = validateAlive(voter);
+
+    if (!validation.success) return validation;
+
+    validation = validateTarget(
+        room,
+        voter.name,
+        targetName
+    );
+
+    if (!validation.success) return validation;
+
+    // Store vote using player's name (or ID if you prefer)
+    room.publicVotes[voter.name] = targetName;
+
+    return {
+        success: true,
+        message: "Vote recorded.",
+    };
+}
+export function werewolfVote(
+    roomCode,
+    socketId,
+    targetName
+) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) {
+        return {
+            success: false,
+            message: "Room not found.",
+        };
+    }
+
+    let validation = validateGameRunning(room);
+
+    if (!validation.success) return validation;
+
+    validation = validatePhase(room, PHASES.NIGHT);
+
+    if (!validation.success) return validation;
+
+    const werewolf = getPlayerBySocket(room, socketId);
+
+    if (!werewolf) {
+        return {
+            success: false,
+            message: "Player not found.",
+        };
+    }
+
+    validation = validateAlive(werewolf);
+
+    if (!validation.success) return validation;
+
+    validation = validateRole(
+        werewolf,
+        "Werewolf"
+    );
+
+    if (!validation.success) return validation;
+
+    validation = validateTarget(
+        room,
+        werewolf.name,
+        targetName
+    );
+
+    if (!validation.success) return validation;
+
+    // Last werewolf vote wins
+    room.nightActions.werewolfTarget = targetName;
+
+    return {
+        success: true,
+        message: "Werewolf target updated.",
+    };
+
+}
+export function knightProtect(
+    roomCode,
+    socketId,
+    targetName
+) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) {
+        return {
+            success: false,
+            message: "Room not found.",
+        };
+    }
+
+    let validation = validateGameRunning(room);
+
+    if (!validation.success) return validation;
+
+    validation = validatePhase(
+        room,
+        PHASES.NIGHT
+    );
+
+    if (!validation.success) return validation;
+
+    const knight = getPlayerBySocket(room, socketId);
+
+    if (!knight) {
+        return {
+            success: false,
+            message: "Player not found.",
+        };
+    }
+
+    validation = validateAlive(knight);
+
+    if (!validation.success) return validation;
+
+    validation = validateRole(
+        knight,
+        "Knight"
+    );
+
+    if (!validation.success) return validation;
+
+    validation = validateTarget(
+        room,
+        knight.name,
+        targetName
+    );
+
+    if (!validation.success) return validation;
+
+    room.nightActions.knightProtect = targetName;
+
+    return {
+        success: true,
+        message: "Protection saved.",
+    };
+
+}
+export function seerPeek(
+    roomCode,
+    socketId,
+    targetName
+) {
+    const room = getRoom(roomCode);
+
+    if (!room) {
+        return {
+            success: false,
+            message: "Room not found.",
+        };
+    }
+
+    let validation = validateGameRunning(room);
+
+    if (!validation.success) return validation;
+
+    validation = validatePhase(room, PHASES.NIGHT);
+
+    if (!validation.success) return validation;
+
+    const seer = getPlayerBySocket(room, socketId);
+
+    if (!seer) {
+        return {
+            success: false,
+            message: "Player not found.",
+        };
+    }
+
+    validation = validateAlive(seer);
+
+    if (!validation.success) return validation;
+
+    validation = validateRole(seer, "Seer");
+
+    if (!validation.success) return validation;
+
+    // Prevent multiple inspections in the same night
+    if (room.seerAction?.seer === socketId) {
+    return {
+        success: false,
+        message: "You have already used your ability tonight.",
+    };
+}
+
+    validation = validateTarget(
+        room,
+        seer.name,
+        targetName
+    );
+
+    if (!validation.success) return validation;
+
+    const target = getPlayer(room, targetName);
+
+    // Record the Seer's action for this night
+    room.seerAction = {
+        seer: socketId,
+        target: target.name,
+    };
+
+    return {
+        success: true,
+        player: target.name,
+        role: target.role,
+    };
+}
+function emitSeerResult(
+    socket,
+    result
+) {
+
+    socket.emit(
+        "seerResult",
+        result
+    );
+
+}
+export function playerDisconnected(roomCode, socketId) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) return;
+
+    const player = room.players.find(
+        player => player.socketId === socketId
+    );
+
+    if (!player) return;
+
+    player.socketId = null;
+
+    player.afk = true;
+
+    if (player.alive) {
+
+        player.alive = false;
+
+    }
+
+    io.to(roomCode).emit(
+        "playerDisconnected",
+        {
+            player: player.name,
+        }
+    );
+
+    if (room.host === player.name) {
+
+        transferHost(room);
+
+    }
+
+    if (checkGameOver(roomCode)) {
+
+        return;
+
+    }
+
+}
+function transferHost(roomCode, room) {
+
+    const nextHost = room.players.find(
+        (player) => player.socketId !== null
+    );
+
+    if (!nextHost) {
+        room.host = null;
+        return;
+    }
+
+    room.host = nextHost.name;
+
+    io.to(roomCode).emit("hostChanged", {
+        host: nextHost.name,
+    });
+
+}
+export function reconnectPlayer(
+    roomCode,
+    playerName,
+    socketId
+) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) {
+
+        return false;
+
+    }
+
+    const player = getPlayer(
+        room,
+        playerName
+    );
+
+    if (!player) {
+
+        return false;
+
+    }
+
+    player.socketId = socketId;
+
+    player.afk = false;
+
+    return true;
+
+}
+export function resetGame(roomCode) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) return;
+
+    clearRoomTimer(room);
+
+    room.started = false;
+
+    room.day = 0;
+
+    room.phase = PHASES.WAITING;
+
+    room.phaseEndTime = null;
+
+    room.publicVotes = {};
+
+    room.werewolfVotes = {};
+
+    room.nightActions = {
+
+        werewolfTarget: null,
+
+        knightProtect: null,
+
+    };
+
+    room.actionTracker = {
+
+        night: {},
+
+        voting: {},
+
+    };
+
+    room.players.forEach(player => {
+
+        player.role = null;
+
+        player.ready = false;
+
+        player.alive = true;
+
+        player.afk = false;
+
+    });
+
+    io.to(roomCode).emit(
+        "gameReset"
+    );
+
+}
+export function leaveRoom(
+    roomCode,
+    playerName
+) {
+
+    const room = getRoom(roomCode);
+
+    if (!room) return;
+
+    room.players =
+        room.players.filter(
+            player =>
+                player.name !== playerName
+        );
+
+    if (
+        room.players.length === 0
+    ) {
+
+        clearRoomTimer(room);
+
+        delete rooms[roomCode];
+
+        return;
+
+    }
+
+    if (
+        room.host === playerName
+    ) {
+
+        room.host =
+            room.players[0].name;
+
+    }
+
+    io.to(roomCode).emit(
+        "playerLeft",
+        room.players
+    );
+
+}

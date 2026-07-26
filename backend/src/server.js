@@ -6,9 +6,17 @@ import { Server } from "socket.io";
 import path from "path";
 import fs from "fs";
 import job from "./lib/cron.js";
+import {app, server} from "./lib/socket.js";
+import messageRoutes from "./routes/messageRoutes.js";
+import gameRoutes from "./routes/gameRoutes.js";
 dotenv.config();
-const app = express();
-
+app.use(express.json());
+app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+app.use("/api", (req, res) => {
+    res.json({ message: "API is working" });
+});
+app.use("/api/messages", messageRoutes);
+app.use("/api/games", gameRoutes);
 const publicDir = path.join(process.cwd(), "public");
 // if the public directory exists, serve the static files
 // this is for the production build
@@ -19,29 +27,6 @@ if (fs.existsSync(publicDir)) {
         res.sendFile(path.join(publicDir, "index.html"), (err) => next(err));
     });
 }
-
-app.use(cors());
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: process.env.FRONTEND_URL,
-    },
-});
-
-app.use(express.json());
-
-io.on("connection", (socket) => {
-    console.log("Connected:", socket.id);
-
-    socket.on("hello", (message) => {
-        console.log(message);
-    });
-    socket.emit("welcome", "Welcome to the server!");
-
-    socket.on("disconnect", () => {
-        console.log("Disconnected:", socket.id);
-    });
-});
 
 const PORT = process.env.PORT || 5000;
 
