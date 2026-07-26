@@ -1,6 +1,8 @@
 import { io } from "socket.io-client";
 
-const SERVER_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// In the Docker deployment the Vite app is served by this same Express server.
+// An explicit VITE_API_URL remains available for separate frontend/backend deployments.
+const SERVER_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 // A single lazy connection is shared by the entire app. Components only add/remove listeners.
 export const socket = io(SERVER_URL, {

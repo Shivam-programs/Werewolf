@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// Use the deployed site's origin by default; localhost is only appropriate when
+// VITE_API_URL is explicitly provided for local split-server development.
+const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_URL}${path}`, {
