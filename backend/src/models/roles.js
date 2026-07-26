@@ -1,4 +1,4 @@
-const roles = [
+export const roles = [
     "Werewolf",
     "Werewolf",
     "Knight",
@@ -7,4 +7,3 @@ const roles = [
     "Villager",
     "Villager",
 ];
-export default roles;

@@ -1,3 +1,5 @@
+import dotenv from "dotenv";
+dotenv.config();
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -11,6 +13,7 @@ import {
     seerPeek,
     reconnectPlayer,
     playerDisconnected,
+    getPublicPlayers
 } from "../controllers/gameController.js";
 
 const app = express();
@@ -45,8 +48,7 @@ io.on("connection", (socket) => {
     Register player after joining room
     */
 
-    socket.on(
-        "registerPlayer",
+    socket.on(        "registerPlayer",
         ({ roomCode, playerName }) => {
 
             socket.join(roomCode);
@@ -87,32 +89,17 @@ io.on("connection", (socket) => {
 
 
 
-    socket.on(
-        "sendPublicMessage",
-        ({ roomCode, message }) => {
+    socket.on("sendPublicMessage", ({ roomCode, message }) => {
+        const result = sendPublicMessage(roomCode, socket.id, message);
 
-            sendPublicMessage(
-                roomCode,
-                socket.id,
-                message
-            );
+        socket.emit("publicMessageResult", result);
+    });
 
-        }
-    );
+    socket.on("sendWerewolfMessage", ({ roomCode, message }) => {
+        const result = sendWerewolfMessage(roomCode, socket.id, message);
 
-    socket.on(
-        "sendWerewolfMessage",
-        ({ roomCode, message }) => {
-
-            sendWerewolfMessage(
-                roomCode,
-                socket.id,
-                message
-            );
-
-        }
-    );
-
+        socket.emit("werewolfMessageResult", result);
+    });
     /*
     Public Vote
     */
@@ -138,35 +125,24 @@ io.on("connection", (socket) => {
     Werewolf Vote
     */
 
-    socket.on(
-        "werewolfVote",
-        ({ roomCode, target }) => {
+    socket.on("werewolfVote", ({ roomCode, target }, callback) => {
+        const result = werewolfVote(roomCode, socket.id, target);
 
-            werewolfVote(
-                roomCode,
-                socket.id,
-                target
-            );
-
+        if (callback) {
+            callback(result);
         }
-    );
-
+    });
     /*
     Knight Protect
     */
 
-    socket.on(
-        "knightProtect",
-        ({ roomCode, target }) => {
+    socket.on("knightProtect", ({ roomCode, target }, callback) => {
+        const result = knightProtect(roomCode, socket.id, target);
 
-            knightProtect(
-                roomCode,
-                socket.id,
-                target
-            );
-
+        if (callback) {
+            callback(result);
         }
-    );
+    });
 
     /*
     Seer Peek

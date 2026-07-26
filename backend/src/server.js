@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+dotenv.config();
 import http from "http";
 import cors from "cors";
 import { Server } from "socket.io";
@@ -9,14 +10,17 @@ import job from "./lib/cron.js";
 import {app, server} from "./lib/socket.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import gameRoutes from "./routes/gameRoutes.js";
-dotenv.config();
+
+
 app.use(express.json());
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
-app.use("/api", (req, res) => {
+app.use("/api/health", (req, res) => {
     res.json({ message: "API is working" });
 });
+
 app.use("/api/messages", messageRoutes);
 app.use("/api/games", gameRoutes);
+
 const publicDir = path.join(process.cwd(), "public");
 // if the public directory exists, serve the static files
 // this is for the production build

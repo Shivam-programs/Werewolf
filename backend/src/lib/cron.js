@@ -1,20 +1,29 @@
 import { CronJob } from "cron";
+import dotenv from "dotenv";
+dotenv.config();
 import http from "node:http";
 import https from "node:https";
 
-// every 14 minutes send a GET request to the health endpoint
+// Every 14 minutes send a GET request to the backend health endpoint
 const job = new CronJob("*/14 * * * *", function () {
-    const base = process.env.FRONTEND_URL;
+    const base = process.env.BACKEND_URL;
     if (!base) return;
-    const url = new URL("/health", base).href;
+    const url = new URL("/api/health", base).href;
     const client = url.startsWith("https:") ? https : http;
 
     client
         .get(url, (res) => {
-            if (res.statusCode === 200) console.log("GET request sent successfully");
-            else console.log("GET request failed", res.statusCode);
+            if (res.statusCode === 200) {
+                console.log("Health check successful");
+            } else {
+                console.log(`Health check failed: ${res.statusCode}`);
+            }
+
+            res.resume(); // consume response
         })
-        .on("error", (e) => console.error("Error while sending request", e));
+        .on("error", (err) => {
+            console.error("Health check error:", err);
+        });
 });
 
 export default job;

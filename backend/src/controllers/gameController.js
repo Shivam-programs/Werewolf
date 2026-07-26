@@ -1,6 +1,6 @@
-import {roles} from "../models/roles.js";
+import { roles } from "../models/roles.js";
+import { rooms } from "../models/rooms.js";
 import { io } from "../lib/socket.js"; // adjust path if needed
-
 
 const MAX_PLAYERS = 7;
 
@@ -24,10 +24,18 @@ function getPlayer(room, playerName) {
         (player) => player.name === playerName
     );
 }
-function getPlayerBySocket(room, socketId) {
+export function getPlayerBySocket(room, socketId) {
     return room.players.find(
         (player) => player.socketId === socketId
     );
+}
+export function getPublicPlayers(room) {
+    return room.players.map(player => ({
+        name: player.name,
+        alive: player.alive,
+        connected: player.connected,
+        ready: player.ready,
+    }));
 }
 function getAlivePlayer(room, playerName) {
     return room.players.find(
@@ -45,30 +53,24 @@ function isDay(room) {
 function isVoting(room) {
     return room.phase === PHASES.VOTING;
 }
-
 function isWaiting(room) {
     return room.phase === PHASES.WAITING;
 }
-
 function isWerewolf(player) {
     return player.role === "Werewolf";
 }
-
 function isKnight(player) {
     return player.role === "Knight";
 }
-
 function isSeer(player) {
     return player.role === "Seer";
 }
-
 function clearRoomTimer(room) {
     if (!room.timer) return;
 
     clearTimeout(room.timer);
     room.timer = null;
 }
-
 function emitPhase(roomCode, room) {
     io.to(roomCode).emit("phaseChanged", {
         phase: room.phase,
@@ -76,7 +78,6 @@ function emitPhase(roomCode, room) {
         endsAt: room.phaseEndTime,
     });
 }
-
 function validateGameRunning(room) {
     if (!room.started) {
         return {
@@ -87,7 +88,6 @@ function validateGameRunning(room) {
 
     return { success: true };
 }
-
 function validateAlive(player) {
     if (!player.alive) {
         return {
@@ -100,7 +100,6 @@ function validateAlive(player) {
         success: true,
     };
 }
-
 function validateTarget(room, actorName, targetName) {
 
     if (actorName === targetName) {
@@ -124,7 +123,6 @@ function validateTarget(room, actorName, targetName) {
         target,
     };
 }
-
 function validatePhase(room, phase) {
 
     if (room.phase !== phase) {
@@ -139,7 +137,6 @@ function validatePhase(room, phase) {
         success: true,
     };
 }
-
 function validateRole(player, role) {
 
     if (player.role !== role) {
@@ -154,7 +151,6 @@ function validateRole(player, role) {
         success: true,
     };
 }
-
 function assignRoles(room) {
 
     const shuffledRoles = [...roles];
@@ -181,7 +177,6 @@ function assignRoles(room) {
 
     });
 }
-
 function sendRoles(roomCode, room) {
 
     room.players.forEach((player) => {
@@ -211,7 +206,6 @@ function sendRoles(roomCode, room) {
     });
 
 }
-
 function createRoom(playerName) {
     return {
         host: playerName,
@@ -229,36 +223,28 @@ function createRoom(playerName) {
         players: [
             {
                 name: playerName,
-
                 socketId: null,
-
                 alive: true,
-
                 connected: true,
-
                 ready: false,
-
                 role: null,
             },
         ],
 
+        // Chat
         publicMessages: [],
-
         werewolfMessages: [],
 
+        // Voting
         publicVotes: {},
-
         werewolfVotes: {},
 
         // Night actions (reset every night)
-        seerAction: null,
-
-        knightAction: null,
-
         werewolfTarget: null,
+        knightAction: null,
+        seerAction: null,
     };
 }
-
 export async function createGame(req, res) {
     try {
 
@@ -298,7 +284,6 @@ export async function createGame(req, res) {
 
     }
 }
-
 export async function joinGame(req, res) {
 
     try {
@@ -306,6 +291,17 @@ export async function joinGame(req, res) {
         const { roomCode } = req.params;
 
         const { playerName } = req.body;
+        if (typeof playerName !== "string") {
+            return res.status(400).json({
+                message: "Player name is required.",
+            });
+        }
+        const trimmedName = playerName.trim();
+        if (!trimmedName) {
+            return res.status(400).json({
+                message: "Player name cannot be empty.",
+            });
+        }
 
         const room = getRoom(roomCode);
 
@@ -327,7 +323,7 @@ export async function joinGame(req, res) {
             });
         }
 
-        const trimmedName = playerName.trim();
+
 
         if (
             room.players.some(
@@ -358,7 +354,7 @@ export async function joinGame(req, res) {
 
         io.to(roomCode).emit(
             "playerJoined",
-            room.players
+            getPublicPlayers(room),
         );
 
         return res.status(200).json({
@@ -382,7 +378,6 @@ export async function joinGame(req, res) {
     }
 
 }
-
 export function startGame(roomCode, socketId) {
 
     const room = getRoom(roomCode);
@@ -410,7 +405,7 @@ export function startGame(roomCode, socketId) {
         };
     }
 
-    if (room.started) { 
+    if (room.started) {
         return {
             success: false,
             message: "Game already started.",
@@ -423,7 +418,7 @@ export function startGame(roomCode, socketId) {
             message: `Exactly ${MAX_PLAYERS} players required.`,
         };
     }
-
+    resetGame(roomCode);
     assignRoles(room);
 
     room.started = true;
@@ -441,7 +436,6 @@ export function startGame(roomCode, socketId) {
     };
 
 }
-
 function startNight(roomCode) {
 
     const room = getRoom(roomCode);
@@ -456,14 +450,14 @@ function startNight(roomCode) {
 
     room.phaseEndTime = Date.now() + NIGHT_DURATION;
 
+    // Reset day/night state
     room.publicVotes = {};
 
+    // Reset night actions
     room.werewolfVotes = {};
-
-    room.nightActions = {
-        werewolfTarget: null,
-        knightProtect: null,
-    };
+    room.werewolfTarget = null;
+    room.knightAction = null;
+    room.seerAction = null;
 
     emitPhase(roomCode, room);
 
@@ -482,12 +476,12 @@ function resolveNightActions(roomCode) {
 
     const target = getAlivePlayer(
         room,
-        room.nightActions.werewolfTarget
+        room.werewolfTarget
     );
 
     const protectedPlayer = getAlivePlayer(
         room,
-        room.nightActions.knightProtect
+        room.knightAction
     );
 
     if (
@@ -497,32 +491,20 @@ function resolveNightActions(roomCode) {
             target.name !== protectedPlayer.name
         )
     ) {
-
         target.alive = false;
-
         eliminatedPlayer = target.name;
-
     }
 
-    room.nightActions = {
-        werewolfTarget: null,
-        knightProtect: null,
-    };
-
-    io.to(roomCode).emit(
-        "nightEnded",
-        {
-            eliminatedPlayer,
-            players: room.players,
-        }
-    );
+    io.to(roomCode).emit("nightEnded", {
+        eliminatedPlayer,
+        players: getPublicPlayers(room),
+    });
 
     if (checkGameOver(roomCode)) {
         return;
     }
 
     startDay(roomCode);
-
 }
 function startDay(roomCode) {
 
@@ -647,7 +629,7 @@ function endVoting(roomCode) {
         "votingEnded",
         {
             eliminatedPlayer,
-            players: room.players,
+            players: getPublicPlayers(room),
         }
     );
 
@@ -831,7 +813,7 @@ export function werewolfVote(
     if (!validation.success) return validation;
 
     // Last werewolf vote wins
-    room.nightActions.werewolfTarget = targetName;
+    room.werewolfTarget = targetName;
 
     return {
         success: true,
@@ -893,7 +875,7 @@ export function knightProtect(
 
     if (!validation.success) return validation;
 
-    room.nightActions.knightProtect = targetName;
+    room.knightAction = targetName;
 
     return {
         success: true,
@@ -942,11 +924,11 @@ export function seerPeek(
 
     // Prevent multiple inspections in the same night
     if (room.seerAction?.seer === socketId) {
-    return {
-        success: false,
-        message: "You have already used your ability tonight.",
-    };
-}
+        return {
+            success: false,
+            message: "You have already used your ability tonight.",
+        };
+    }
 
     validation = validateTarget(
         room,
@@ -1012,7 +994,7 @@ export function playerDisconnected(roomCode, socketId) {
 
     if (room.host === player.name) {
 
-        transferHost(room);
+        transferHost(roomCode, room);
 
     }
 
@@ -1093,13 +1075,10 @@ export function resetGame(roomCode) {
 
     room.werewolfVotes = {};
 
-    room.nightActions = {
-
-        werewolfTarget: null,
-
-        knightProtect: null,
-
-    };
+    room.werewolfTarget = null;
+    room.knightAction = null;
+    room.seerAction = null;
+    room.werewolfVotes = {};
 
     room.actionTracker = {
 
@@ -1164,7 +1143,7 @@ export function leaveRoom(
 
     io.to(roomCode).emit(
         "playerLeft",
-        room.players
+        getPublicPlayers(room)
     );
 
 }

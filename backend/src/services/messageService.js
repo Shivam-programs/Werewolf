@@ -1,8 +1,8 @@
 // services/messageService.js
 
-import rooms from "../models/rooms.js";
-import { io } from "../server.js";
-import { getPlayerBySocket } from "./gameService.js";
+import {rooms} from "../models/rooms.js";
+import { io } from "../lib/socket.js";
+import { getPlayerBySocket } from "../controllers/gameController.js";
 export function sendPublicMessage(
     roomCode,
     socketId,

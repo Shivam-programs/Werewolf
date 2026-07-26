@@ -1,5 +1,6 @@
 
-import rooms from "../models/rooms.js";
+import {rooms} from "../models/rooms.js";
+import {getPublicPlayers} from "../controllers/gameController.js";
 
 export async function getPlayers(req, res) {
     try {
@@ -13,7 +14,10 @@ export async function getPlayers(req, res) {
             });
         }
 
-        return res.status(200).json(room.players);
+        return res.status(200).json({
+            success: true,
+            players: getPublicPlayers(room),
+        });
 
     } catch (error) {
 
