@@ -27,7 +27,7 @@ export default function WaitingRoom({ onLeave }) {
       <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8">
         <header className="mb-8 flex items-center justify-between">
           <a href="/" className="font-display text-2xl text-zinc-100">
-            WARE <span className="text-amber-200">WOLF</span>
+            WERE <span className="text-amber-200">WOLF</span>
           </a>
           <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-400">
             Waiting room

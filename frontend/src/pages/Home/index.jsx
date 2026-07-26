@@ -59,7 +59,7 @@ export default function Home() {
           </div>
           <p className="eyebrow">Suspicion is the greatest weapon </p>
           <h1 className="font-display mt-3 text-6xl leading-[.85] text-zinc-50 sm:text-8xl">
-            WARE
+            WERE
             <br />
             <span className="text-amber-200"> &nbsp;&nbsp;&nbsp; WOLF</span>
           </h1>

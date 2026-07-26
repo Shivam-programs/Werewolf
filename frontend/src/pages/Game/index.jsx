@@ -43,7 +43,7 @@ export default function Game() {
         <header className="mb-4 flex items-center justify-between gap-3">
           <div>
             <p className="font-display text-xl text-zinc-100 sm:text-2xl">
-              WARE <span className="text-amber-200">WOLF</span>
+              WERE <span className="text-amber-200">WOLF</span>
             </p>
             <p className="mt-1 text-[10px] uppercase tracking-[.18em] text-zinc-600">
               Room {roomCode}
