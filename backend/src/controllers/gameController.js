@@ -109,7 +109,12 @@ function validateTarget(room, actorName, targetName) {
         };
     }
 
+    const actor = getAlivePlayer(room, actorName);
     const target = getAlivePlayer(room, targetName);
+
+    console.log("=== validateTarget ===");
+    console.log("Actor:", actor);
+    console.log("Target:", target);
 
     if (!target) {
         return {
@@ -117,6 +122,20 @@ function validateTarget(room, actorName, targetName) {
             message: "Target must be alive.",
         };
     }
+
+    if (
+        actor?.role === "Werewolf" &&
+        target?.role === "Werewolf"
+    ) {
+        console.log("Blocked: Werewolf -> Werewolf");
+
+        return {
+            success: false,
+            message: "Werewolves cannot target another werewolf.",
+        };
+    }
+
+    console.log("Target allowed");
 
     return {
         success: true,
@@ -150,6 +169,38 @@ function validateRole(player, role) {
     return {
         success: true,
     };
+}
+function hasSubmittedVote(votes, playerName) {
+    return Object.prototype.hasOwnProperty.call(votes || {}, playerName);
+}
+function haveAllLivingPlayersVoted(room) {
+    const livingPlayers = room.players.filter(player => player.alive);
+
+    return (
+        livingPlayers.length > 0 &&
+        livingPlayers.every(player =>
+            hasSubmittedVote(room.publicVotes, player.name)
+        )
+    );
+}
+function haveAllLivingNightRolesActed(room) {
+    const requiredActors = room.players.filter(
+        player =>
+            player.alive &&
+            ["Werewolf", "Knight", "Seer"].includes(player.role)
+    );
+
+    return requiredActors.every(player => {
+        if (player.role === "Werewolf") {
+            return hasSubmittedVote(room.werewolfVotes, player.name);
+        }
+
+        if (player.role === "Knight") {
+            return Boolean(room.knightAction);
+        }
+
+        return room.seerAction?.seer === player.socketId;
+    });
 }
 function assignRoles(room) {
 
@@ -474,10 +525,26 @@ function resolveNightActions(roomCode) {
 
     let eliminatedPlayer = null;
 
-    const target = getAlivePlayer(
-        room,
-        room.werewolfTarget
-    );
+    // Get all werewolf votes
+    const votes = Object.values(room.werewolfVotes || {});
+
+    let targetName = null;
+
+    if (votes.length === 1) {
+        // Only one werewolf voted
+        targetName = votes[0];
+    } else if (votes.length >= 2) {
+        // Both werewolves voted
+        if (votes[0] === votes[1]) {
+            // Same target
+            targetName = votes[0];
+        } else {
+            // Different targets -> choose randomly
+            targetName = votes[Math.floor(Math.random() * votes.length)];
+        }
+    }
+
+    const target = getAlivePlayer(room, targetName);
 
     const protectedPlayer = getAlivePlayer(
         room,
@@ -494,6 +561,11 @@ function resolveNightActions(roomCode) {
         target.alive = false;
         eliminatedPlayer = target.name;
     }
+
+    // Reset night actions
+    room.werewolfVotes = {};
+    room.knightAction = null;
+    room.seerAction = null;
 
     io.to(roomCode).emit("nightEnded", {
         eliminatedPlayer,
@@ -756,6 +828,10 @@ export function publicVote(roomCode, socketId, targetName) {
     // Store vote using player's name (or ID if you prefer)
     room.publicVotes[voter.name] = targetName;
 
+    if (haveAllLivingPlayersVoted(room)) {
+        endVoting(roomCode);
+    }
+
     return {
         success: true,
         message: "Vote recorded.",
@@ -766,7 +842,6 @@ export function werewolfVote(
     socketId,
     targetName
 ) {
-
     const room = getRoom(roomCode);
 
     if (!room) {
@@ -812,12 +887,21 @@ export function werewolfVote(
 
     if (!validation.success) return validation;
 
-    // Last werewolf vote wins
-    room.werewolfTarget = targetName;
+    // Initialize vote storage if it doesn't exist
+    if (!room.werewolfVotes) {
+        room.werewolfVotes = {};
+    }
+
+    // Store this werewolf's vote
+    room.werewolfVotes[werewolf.name] = targetName;
+
+    if (haveAllLivingNightRolesActed(room)) {
+        resolveNightActions(roomCode);
+    }
 
     return {
         success: true,
-        message: "Werewolf target updated.",
+        message: "Werewolf vote recorded.",
     };
 
 }
@@ -876,6 +960,10 @@ export function knightProtect(
     if (!validation.success) return validation;
 
     room.knightAction = targetName;
+
+    if (haveAllLivingNightRolesActed(room)) {
+        resolveNightActions(roomCode);
+    }
 
     return {
         success: true,
@@ -945,6 +1033,10 @@ export function seerPeek(
         seer: socketId,
         target: target.name,
     };
+
+    if (haveAllLivingNightRolesActed(room)) {
+        resolveNightActions(roomCode);
+    }
 
     return {
         success: true,
@@ -1075,7 +1167,7 @@ export function resetGame(roomCode) {
 
     room.werewolfVotes = {};
 
-    room.werewolfTarget = null;
+    room.werewolfTarget = {};
     room.knightAction = null;
     room.seerAction = null;
     room.werewolfVotes = {};

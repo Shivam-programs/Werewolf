@@ -4,10 +4,9 @@ import { socket } from "../../services/socket";
 
 function Feed({ messages, accent }) {
   const endRef = useRef(null);
-  useEffect(
-    () => endRef.current?.scrollIntoView({ behavior: "smooth" }),
-    [messages],
-  );
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
   return (
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
       {messages.length === 0 && (

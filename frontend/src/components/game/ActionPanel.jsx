@@ -17,6 +17,7 @@ export function ActionPanel() {
     players,
     phase,
     ownRole,
+    werewolfTeammates,
     actionSubmitted,
     voteSubmitted,
     markActionSubmitted,
@@ -26,6 +27,12 @@ export function ActionPanel() {
   const aliveOthers = players.filter(
     (p) => p.alive !== false && p.name !== playerName,
   );
+  const currentPlayer = players.find((player) => player.name === playerName);
+  const isAlive = currentPlayer?.alive !== false;
+  const eligibleTargets =
+    phase === "night" && ownRole === "Werewolf"
+      ? aliveOthers.filter((player) => !werewolfTeammates.includes(player.name))
+      : aliveOthers;
   const castVote = () => {
     if (!selected) return toast.error("Choose a player first.");
     socket.emit("publicVote", { roomCode, target: selected });
@@ -51,6 +58,16 @@ export function ActionPanel() {
             The village holds its breath.
           </p>
           <p>Waiting for the next phase.</p>
+        </div>
+      </div>
+    );
+  if (phase === "voting" && !isAlive)
+    return (
+      <div className="action-copy">
+        <span className="action-icon">✕</span>
+        <div>
+          <p className="font-semibold text-zinc-100">You have fallen.</p>
+          <p>You can observe the vote, but cannot take part in it.</p>
         </div>
       </div>
     );
@@ -100,7 +117,7 @@ export function ActionPanel() {
         )}
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {aliveOthers.map((player) => (
+        {eligibleTargets.map((player) => (
           <button
             disabled={submitted}
             onClick={() => setSelected(player.name)}
@@ -115,7 +132,7 @@ export function ActionPanel() {
         ))}
       </div>
       <Button
-        disabled={submitted || !aliveOthers.length}
+        disabled={submitted || !eligibleTargets.length}
         onClick={submit}
         className="mt-4 w-full"
       >

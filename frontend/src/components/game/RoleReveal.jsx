@@ -28,7 +28,7 @@ const lore = {
   },
 };
 
-export function RoleReveal({ role }) {
+export function RoleReveal({ role, Teammates }) {
   const info = lore[role] || lore.Villager;
   const [open, setOpen] = useState(true);
   useEffect(() => {
@@ -64,6 +64,23 @@ export function RoleReveal({ role }) {
             <p className="mx-auto mt-4 max-w-xs leading-relaxed text-zinc-300">
               {info.text}
             </p>
+            {Teammates && (
+              <div className="mt-6">
+                <p className="text-sm text-zinc-400">
+                  Your teammates are:
+                </p>
+                <div className="mt-2 flex flex-wrap justify-center gap-2">
+                  {Teammates.map((teammate) => (
+                    <span
+                      key={teammate}
+                      className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-amber-100"
+                    >
+                      {teammate}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             <button
               onClick={() => setOpen(false)}
               className="mt-7 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-bold text-zinc-100 hover:bg-white/15"

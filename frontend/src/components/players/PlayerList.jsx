@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useGameStore } from "../../store/gameStore";
 
 export function PlayerList({ waiting = false }) {
-  const { players, playerName, host } = useGameStore();
+  const { players, playerName, host, ownRole, werewolfTeammates, revealedRoles } = useGameStore();
   return (
     <section className="panel flex min-h-0 flex-col p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between">
@@ -17,8 +17,16 @@ export function PlayerList({ waiting = false }) {
         </span>
       </div>
       <div className="space-y-2 overflow-auto pr-1">
-        {players.map((player, index) => (
-          <motion.div
+        {players.map((player, index) => {
+          const revealedRole = revealedRoles[player.name];
+          const teammateRole =
+            ownRole === "Werewolf" && werewolfTeammates.includes(player.name)
+              ? "Werewolf"
+              : null;
+          const visibleRole = revealedRole || teammateRole;
+
+          return (
+            <motion.div
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.03 }}
@@ -38,6 +46,11 @@ export function PlayerList({ waiting = false }) {
                 {player.name === playerName && (
                   <span className="text-xs text-amber-200">(you)</span>
                 )}
+                {visibleRole && (
+                  <span className="ml-1.5 text-xs text-rose-200">
+                    ({visibleRole})
+                  </span>
+                )}
               </p>
               <p className="text-[11px] uppercase tracking-wider text-zinc-500">
                 {player.alive === false ? "Fallen" : "Alive"}
@@ -48,8 +61,9 @@ export function PlayerList({ waiting = false }) {
                 ♛
               </span>
             )}
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
         {Array.from({ length: Math.max(0, 7 - players.length) }).map((_, i) => (
           <div
             key={`empty-${i}`}

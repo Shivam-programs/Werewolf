@@ -26,6 +26,7 @@ export default function Game() {
     phaseEndTime,
     ownRole,
     roleRevealId,
+    werewolfTeammates,
     gameResult,
     playerName,
     leave,
@@ -89,7 +90,7 @@ export default function Game() {
           <ChatPanel />
         </div>
       </div>
-      {ownRole && <RoleReveal key={roleRevealId} role={ownRole} />}
+      {ownRole && <RoleReveal key={roleRevealId} role={ownRole} Teammates={werewolfTeammates} />}
       <GameOver
         result={gameResult}
         onPlayAgain={() => socket.emit("startGame", { roomCode })}

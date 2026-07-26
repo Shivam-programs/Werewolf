@@ -17,6 +17,7 @@ export const useGameStore = create((set) => ({
   ownRole: null,
   roleRevealId: 0,
   werewolfTeammates: [],
+  revealedRoles: {},
   messages: [],
   werewolfMessages: [],
   voteSubmitted: false,
@@ -29,16 +30,19 @@ export const useGameStore = create((set) => ({
   }),
   setPlayers: (players) => set({ players }),
   setPhase: ({ phase, day, endsAt }) => set({ phase, day, phaseEndTime: endsAt || null, voteSubmitted: false, actionSubmitted: false }),
-  setRole: ({ role, teammates = [] }) => set((state) => ({ ownRole: role, werewolfTeammates: teammates, roleRevealId: state.roleRevealId + 1 })),
+  setRole: ({ role, teammates = [] }) => set((state) => ({ ownRole: role, werewolfTeammates: teammates, revealedRoles: {}, roleRevealId: state.roleRevealId + 1 })),
+  revealPlayerRole: ({ player, role }) => set((state) => ({
+    revealedRoles: { ...state.revealedRoles, [player]: role },
+  })),
   addMessage: (message, privateMessage = false) => set((state) => ({
     [privateMessage ? "werewolfMessages" : "messages"]: [...state[privateMessage ? "werewolfMessages" : "messages"], message],
   })),
   markVoteSubmitted: () => set({ voteSubmitted: true }),
   markActionSubmitted: () => set({ actionSubmitted: true }),
   setGameResult: (gameResult) => set({ gameResult, phase: "ended", phaseEndTime: null }),
-  resetRound: () => set({ ownRole: null, werewolfTeammates: [], voteSubmitted: false, actionSubmitted: false, gameResult: null }),
+  resetRound: () => set({ ownRole: null, werewolfTeammates: [], revealedRoles: {}, voteSubmitted: false, actionSubmitted: false, gameResult: null }),
   leave: () => {
     sessionStorage.removeItem("howl-hollow-session");
-    set({ roomCode: "", playerName: "", players: [], host: "", phase: "waiting", day: 0, phaseEndTime: null, ownRole: null, werewolfTeammates: [], messages: [], werewolfMessages: [], voteSubmitted: false, actionSubmitted: false, gameResult: null });
+    set({ roomCode: "", playerName: "", players: [], host: "", phase: "waiting", day: 0, phaseEndTime: null, ownRole: null, werewolfTeammates: [], revealedRoles: {}, messages: [], werewolfMessages: [], voteSubmitted: false, actionSubmitted: false, gameResult: null });
   },
 }));

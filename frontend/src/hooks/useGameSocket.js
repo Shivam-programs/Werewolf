@@ -5,7 +5,7 @@ import { ensureSocket, socket, subscribeSocket } from "../services/socket";
 import { useGameStore } from "../store/gameStore";
 
 export function useGameSocket() {
-  const { roomCode, playerName, setPlayers, setPhase, setRole, addMessage, setGameResult, resetRound } = useGameStore();
+  const { roomCode, playerName, setPlayers, setPhase, setRole, addMessage, revealPlayerRole, setGameResult, resetRound } = useGameStore();
   useEffect(() => {
     if (!roomCode || !playerName) return undefined;
     const register = () => socket.emit("registerPlayer", { roomCode, playerName });
@@ -26,7 +26,11 @@ export function useGameSocket() {
       publicMessageResult: (result) => result.success || toast.error(result.message || "Message failed."),
       werewolfMessageResult: (result) => result.success || toast.error(result.message || "Message failed."),
       actionError: (result) => toast.error(result.message),
-      seerResult: (result) => result.success ? toast.success(`${result.player} is ${result.role}.`) : toast.error(result.message),
+      seerResult: (result) => {
+        if (!result.success) return toast.error(result.message);
+        revealPlayerRole(result);
+        return toast.success(`${result.player} is ${result.role}.`);
+      },
       nightEnded: ({ eliminatedPlayer, players }) => { setPlayers(players); toast(eliminatedPlayer ? `${eliminatedPlayer} did not survive the night.` : "The night passed without a victim.", { icon: "☾" }); },
       votingEnded: ({ eliminatedPlayer, players }) => { setPlayers(players); toast(eliminatedPlayer ? `${eliminatedPlayer} was cast out.` : "The vote ended in a tie.", { icon: "⚖" }); },
       gameEnded: setGameResult,
@@ -34,5 +38,5 @@ export function useGameSocket() {
     });
     refreshPlayers();
     return cleanup;
-  }, [roomCode, playerName, setPlayers, setPhase, setRole, addMessage, setGameResult, resetRound]);
+  }, [roomCode, playerName, setPlayers, setPhase, setRole, addMessage, revealPlayerRole, setGameResult, resetRound]);
 }
