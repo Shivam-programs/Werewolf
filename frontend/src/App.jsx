@@ -12,10 +12,29 @@ function Room() {
   const { roomCode, phase, leave } = useGameStore();
   useGameSocket();
   if (!roomCode) return <Navigate to="/" replace />;
-  const exit = () => { socket.disconnect(); leave(); navigate("/"); };
+  const exit = () => {
+    socket.disconnect();
+    leave();
+    navigate("/");
+  };
   return phase === "waiting" ? <WaitingRoom onLeave={exit} /> : <Game />;
 }
 
 export default function App() {
-  return <><Routes><Route path="/" element={<Home />} /><Route path="/room/:roomCode" element={<Room />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes><Toaster position="top-right" toastOptions={{ className: "!bg-zinc-900 !text-zinc-100 !border !border-white/10", duration: 3500 }} /></>;
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/room/:roomCode" element={<Room />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          className: "!bg-zinc-900 !text-zinc-100 !border !border-white/10",
+          duration: 3500,
+        }}
+      />
+    </>
+  );
 }
