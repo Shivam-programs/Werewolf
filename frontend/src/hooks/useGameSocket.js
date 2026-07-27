@@ -21,6 +21,7 @@ export function useGameSocket() {
       playerJoined: setPlayers,
       playerLeft: setPlayers,
       playerConnected: refreshPlayers,
+      playerDisconnected: ({ players }) => setPlayers(players),
       phaseChanged: setPhase,
       roleAssigned: (data) => { setRole(data); },
       newPublicMessage: (message) => addMessage(message),
@@ -56,6 +57,7 @@ export function useGameSocket() {
           (result.winner === "Werewolves" && ownRole === "Werewolf") ||
           (result.winner === "Villagers" && ownRole !== null && ownRole !== "Werewolf");
         if (won) play("winner");
+        else if (ownRole !== null) play("defeat");
       },
       gameReset: () => { resetRound(); toast("A new hunt begins.", { icon: "✦" }); },
     });

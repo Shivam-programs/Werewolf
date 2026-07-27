@@ -33,6 +33,8 @@ export function getPublicPlayers(room) {
     return room.players.map(player => ({
         name: player.name,
         alive: player.alive,
+        // A role becomes public knowledge as soon as its player dies.
+        role: player.alive ? null : player.role,
         connected: player.connected,
         ready: player.ready,
     }));
@@ -1078,6 +1080,7 @@ export function playerDisconnected(roomCode, socketId) {
         "playerDisconnected",
         {
             player: player.name,
+            players: getPublicPlayers(room),
         }
     );
 

@@ -11,6 +11,7 @@ const soundSources = {
   seerWolf: "/gameAudio/werewolf-reveal-by-seer.MP3",
   seerVillager: "/gameAudio/villager-reveal-by-seer.MP3",
   winner: "/gameAudio/winner.MP3",
+  defeat: "/gameAudio/defeat.MP3",
 };
 
 const phaseSoundNames = new Set(["day", "night", "voting"]);

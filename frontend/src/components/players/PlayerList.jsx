@@ -23,7 +23,11 @@ export function PlayerList({ waiting = false }) {
             ownRole === "Werewolf" && werewolfTeammates.includes(player.name)
               ? "Werewolf"
               : null;
-          const visibleRole = revealedRole || teammateRole;
+          // Dead players' roles are supplied by the server and remain visible
+          // to every player for the rest of the round.
+          const visibleRole = player.alive === false
+            ? player.role
+            : revealedRole || teammateRole;
 
           return (
             <motion.div
