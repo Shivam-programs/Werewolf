@@ -60,7 +60,7 @@ export function ActionPanel() {
         <span className="action-icon">☼</span>
         <div>
           <p className="font-semibold text-zinc-100">The village is awake.</p>
-          <p>Discuss what you saw. The vote begins when the sun sets.</p>
+          <p>Discuss what you think. The vote begins when the sun sets.</p>
         </div>
       </div>
     );
@@ -128,15 +128,18 @@ export function ActionPanel() {
         )}
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {eligibleTargets.map((player) => (
-          <button
+        {eligibleTargets.map((player) => {
+          const playerNumber = players.findIndex(({ name }) => name === player.name) + 1;
+
+          return (
+            <button
             disabled={submitted}
             onClick={() => setSelected(player.name)}
             key={player.name}
             className={`rounded-xl border p-3 text-left text-sm transition ${selectedTarget === player.name ? "border-amber-300 bg-amber-300/10 text-amber-100" : "border-white/8 bg-white/2.5]text-zinc-300 hover:border-white/20"}`}
           >
             <span className="mb-2 grid h-7 w-7 place-items-center rounded-md bg-black/20 text-xs font-bold">
-              {player.name[0]}
+              {playerNumber}
             </span>
             <span className="flex items-center justify-between gap-2">
               {player.name}
@@ -146,8 +149,9 @@ export function ActionPanel() {
                 </span>
               )}
             </span>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
       <Button
         disabled={submitted || !eligibleTargets.length}

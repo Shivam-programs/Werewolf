@@ -40,9 +40,7 @@ export function PlayerList({ waiting = false }) {
             <span
               className={`grid h-8 w-8 place-items-center rounded-lg text-xs font-black ${player.alive === false ? "bg-rose-500/15 text-rose-300" : "bg-zinc-800 text-amber-200"}`}
             >
-              {player.alive === false
-                ? "✕"
-                : player.name.slice(0, 1).toUpperCase()}
+              {index + 1}
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-zinc-200">
