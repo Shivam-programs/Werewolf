@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGameStore } from "../../store/gameStore";
 import { socket } from "../../services/socket";
@@ -8,6 +9,7 @@ import { ActionPanel } from "../../components/game/ActionPanel";
 import { RoleReveal } from "../../components/game/RoleReveal";
 import { GameOver } from "../../components/game/GameOver";
 import { Countdown } from "../../components/ui/Countdown";
+import { useGameSounds } from "../../hooks/useGameSounds";
 
 const phaseLabels = {
   night: ["Night", "☾", "The wolves are listening."],
@@ -19,6 +21,8 @@ const phaseLabels = {
 
 export default function Game() {
   const navigate = useNavigate();
+  const { play, enable, disable } = useGameSounds();
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const {
     roomCode,
     phase,
@@ -31,11 +35,19 @@ export default function Game() {
     playerName,
     leave,
   } = useGameStore();
+  useEffect(() => {
+    if (["night", "day", "voting"].includes(phase)) play(phase);
+  }, [phase, play]);
   const [title, icon, description] = phaseLabels[phase] || phaseLabels.waiting;
   const home = () => {
     socket.disconnect();
     leave();
     navigate("/");
+  };
+  const toggleSound = () => {
+    if (soundEnabled) disable();
+    else enable();
+    setSoundEnabled((enabled) => !enabled);
   };
   return (
     <main className="game-shell">
@@ -50,6 +62,16 @@ export default function Game() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSound}
+              aria-pressed={!soundEnabled}
+              aria-label={soundEnabled ? "Mute game sounds" : "Enable game sounds"}
+              title={soundEnabled ? "Mute sounds" : "Enable sounds"}
+              className="rounded-lg border border-white/10 bg-white/3 px-2.5 py-1.5 text-xs font-bold text-zinc-200 transition hover:border-amber-200/40 hover:bg-white/7"
+            >
+              {soundEnabled ? "🔊 Sound on" : "🔇 Sound off"}
+            </button>
             <span className="hidden text-xs text-zinc-500 sm:inline">
               You are <b className="text-zinc-200">{playerName}</b>
             </span>

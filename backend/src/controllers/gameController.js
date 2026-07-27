@@ -100,9 +100,13 @@ function validateAlive(player) {
         success: true,
     };
 }
-function validateTarget(room, actorName, targetName) {
-
-    if (actorName === targetName) {
+function validateTarget(
+    room,
+    actorName,
+    targetName,
+    { allowSelf = false } = {}
+) {
+    if (!allowSelf && actorName === targetName) {
         return {
             success: false,
             message: "You cannot target yourself.",
@@ -111,10 +115,6 @@ function validateTarget(room, actorName, targetName) {
 
     const actor = getAlivePlayer(room, actorName);
     const target = getAlivePlayer(room, targetName);
-
-    console.log("=== validateTarget ===");
-    console.log("Actor:", actor);
-    console.log("Target:", target);
 
     if (!target) {
         return {
@@ -127,15 +127,11 @@ function validateTarget(room, actorName, targetName) {
         actor?.role === "Werewolf" &&
         target?.role === "Werewolf"
     ) {
-        console.log("Blocked: Werewolf -> Werewolf");
-
         return {
             success: false,
             message: "Werewolves cannot target another werewolf.",
         };
     }
-
-    console.log("Target allowed");
 
     return {
         success: true,
@@ -524,6 +520,7 @@ function resolveNightActions(roomCode) {
     if (!room) return;
 
     let eliminatedPlayer = null;
+    let protectedPlayerName = null;
 
     // Get all werewolf votes
     const votes = Object.values(room.werewolfVotes || {});
@@ -551,15 +548,13 @@ function resolveNightActions(roomCode) {
         room.knightAction
     );
 
-    if (
-        target &&
-        (
-            !protectedPlayer ||
-            target.name !== protectedPlayer.name
-        )
-    ) {
-        target.alive = false;
-        eliminatedPlayer = target.name;
+    if (target) {
+        if (protectedPlayer && target.name === protectedPlayer.name) {
+            protectedPlayerName = target.name;
+        } else {
+            target.alive = false;
+            eliminatedPlayer = target.name;
+        }
     }
 
     // Reset night actions
@@ -569,6 +564,7 @@ function resolveNightActions(roomCode) {
 
     io.to(roomCode).emit("nightEnded", {
         eliminatedPlayer,
+        protectedPlayer: protectedPlayerName,
         players: getPublicPlayers(room),
     });
 
@@ -954,7 +950,8 @@ export function knightProtect(
     validation = validateTarget(
         room,
         knight.name,
-        targetName
+        targetName,
+        { allowSelf: true }
     );
 
     if (!validation.success) return validation;

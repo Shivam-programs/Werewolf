@@ -1,23 +1,63 @@
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 
-// Keep audio sources configurable and copyright-safe. Supply local assets through VITE_SOUND_*.
 const soundSources = {
-  click: import.meta.env.VITE_SOUND_CLICK,
-  day: import.meta.env.VITE_SOUND_DAY,
-  night: import.meta.env.VITE_SOUND_NIGHT,
-  win: import.meta.env.VITE_SOUND_WIN,
-  lose: import.meta.env.VITE_SOUND_LOSE,
-  death: import.meta.env.VITE_SOUND_DEATH,
+  select: "/gameAudio/select-sound.MP3",
+  day: "/gameAudio/day-sound.MP3",
+  night: "/gameAudio/night-sound.MP3",
+  voting: "/gameAudio/village-vote-phase.MP3",
+  voteKick: "/gameAudio/vote-kicked.MP3",
+  killed: "/gameAudio/killed-by-werewolf.MP3",
+  protected: "/gameAudio/protected-by-knight.MP3",
+  seerWolf: "/gameAudio/werewolf-reveal-by-seer.MP3",
+  seerVillager: "/gameAudio/villager-reveal-by-seer.MP3",
+  winner: "/gameAudio/winner.MP3",
 };
 
-export function useGameSounds() {
-  const enabled = useRef(true);
-  const play = useCallback((name) => {
-    const source = soundSources[name];
-    if (!enabled.current || !source) return;
-    const audio = new Audio(source);
+const phaseSoundNames = new Set(["day", "night", "voting"]);
+
+const audioPlayers = Object.fromEntries(
+  Object.entries(soundSources).map(([name, source]) => {
+    const audio = new Audio();
+    audio.preload = "auto";
+    audio.src = source;
     audio.volume = 0.45;
-    audio.play().catch(() => { });
+    audio.load();
+    return [name, audio];
+  }),
+);
+
+let soundsEnabled = true;
+
+export function useGameSounds() {
+  const play = useCallback((name) => {
+    const audio = audioPlayers[name];
+    if (!soundsEnabled || !audio) return;
+
+    if (phaseSoundNames.has(name)) {
+      phaseSoundNames.forEach((phaseSoundName) => {
+        if (phaseSoundName === name) return;
+        const phaseAudio = audioPlayers[phaseSoundName];
+        phaseAudio.pause();
+        phaseAudio.currentTime = 0;
+      });
+    }
+
+    audio.pause();
+    audio.currentTime = 0;
+    audio.play().catch(() => undefined);
   }, []);
-  return { play, setEnabled: (value) => { enabled.current = value; } };
+
+  const enable = useCallback(() => {
+    soundsEnabled = true;
+  }, []);
+
+  const disable = useCallback(() => {
+    soundsEnabled = false;
+    Object.values(audioPlayers).forEach((audio) => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+  }, []);
+
+  return { play, enable, disable };
 }

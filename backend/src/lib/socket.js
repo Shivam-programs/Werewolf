@@ -108,8 +108,12 @@ io.on("connection", (socket) => {
     Public Vote
     */
 
-    socket.on("publicVote", ({ roomCode, target }) => {
+    socket.on("publicVote", ({ roomCode, target }, callback) => {
         const result = publicVote(roomCode, socket.id, target);
+
+        if (callback) {
+            callback(result);
+        }
 
         if (!result.success) {
             socket.emit("actionError", {
@@ -154,7 +158,7 @@ io.on("connection", (socket) => {
 
     socket.on(
         "seerPeek",
-        ({ roomCode, target }) => {
+        ({ roomCode, target }, callback) => {
 
             const result =
                 seerPeek(
@@ -162,6 +166,10 @@ io.on("connection", (socket) => {
                     socket.id,
                     target
                 );
+
+            if (callback) {
+                callback(result);
+            }
 
             socket.emit(
                 "seerResult",
