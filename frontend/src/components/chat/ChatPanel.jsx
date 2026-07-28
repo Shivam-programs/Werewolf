@@ -8,7 +8,10 @@ function Feed({ messages, accent }) {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   return (
-    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+    <div
+      className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1"
+      aria-label="Chat messages"
+    >
       {messages.length === 0 && (
         <p className="mt-7 text-center text-xs italic text-zinc-600">
           No voices yet.
@@ -44,8 +47,8 @@ export function ChatPanel() {
     setText("");
   };
   return (
-    <section className="panel flex min-h-85 flex-col p-4 sm:p-5">
-      <div className="mb-4 flex items-center gap-2 border-b border-white/[.07] pb-3">
+    <section className="panel flex h-120 max-h-[calc(100vh-2rem)] flex-col p-4 sm:p-5 xl:sticky xl:top-4">
+      <div className="mb-4 flex items-center gap-2 border-b border-white/7 pb-3">
         <button
           onClick={() => setTab("public")}
           className={`text-sm font-semibold ${!privateActive ? "text-amber-200" : "text-zinc-500"}`}
