@@ -30,7 +30,11 @@ export function getPlayerBySocket(room, socketId) {
     );
 }
 export function getPublicPlayers(room) {
-    return room.players.map(player => ({
+    const visiblePlayers = room.replayQueue
+        ? room.players.filter((player) => player.ready)
+        : room.players;
+
+    return visiblePlayers.map(player => ({
         name: player.name,
         alive: player.alive,
         // A role becomes public knowledge as soon as its player dies.
@@ -38,6 +42,37 @@ export function getPublicPlayers(room) {
         connected: player.connected,
         ready: player.ready,
     }));
+}
+export function getRoomState(roomCode, socketId) {
+    const room = getRoom(roomCode);
+
+    if (!room) {
+        return { success: false, message: "Room not found." };
+    }
+
+    const player = getPlayerBySocket(room, socketId);
+
+    if (!player) {
+        return { success: false, message: "Player not found in this room." };
+    }
+
+    return {
+        success: true,
+        room: {
+            host: room.host,
+            started: room.started,
+            phase: room.replayQueue && player.ready ? PHASES.WAITING : room.phase,
+            day: room.replayQueue && player.ready ? 0 : room.day,
+            endsAt: room.replayQueue && player.ready ? null : room.phaseEndTime,
+            players: getPublicPlayers(room),
+            role: room.started ? player.role : null,
+            teammates: room.started && player.role === "Werewolf"
+                ? room.players
+                    .filter((otherPlayer) => otherPlayer.role === "Werewolf" && otherPlayer.name !== player.name)
+                    .map((otherPlayer) => otherPlayer.name)
+                : [],
+        },
+    };
 }
 function getAlivePlayer(room, playerName) {
     return room.players.find(
@@ -261,6 +296,8 @@ function createRoom(playerName) {
 
         started: false,
 
+        replayQueue: false,
+
         phase: PHASES.WAITING,
 
         phaseEndTime: null,
@@ -366,6 +403,20 @@ export async function joinGame(req, res) {
             });
         }
 
+        if (room.replayQueue) {
+            // A player who did not opt into the next round releases their seat.
+            const replaceablePlayer = room.players.find((player) => !player.ready);
+            if (replaceablePlayer) {
+                const wasHost = room.host === replaceablePlayer.name;
+                room.players = room.players.filter((player) => player !== replaceablePlayer);
+
+                if (wasHost) {
+                    room.host = room.players[0]?.name || trimmedName;
+                    io.to(roomCode).emit("hostChanged", { host: room.host });
+                }
+            }
+        }
+
         if (room.players.length >= MAX_PLAYERS) {
             return res.status(400).json({
                 message: "Room is full.",
@@ -400,6 +451,10 @@ export async function joinGame(req, res) {
             role: null,
 
         });
+
+        if (room.replayQueue) {
+            room.players[room.players.length - 1].ready = true;
+        }
 
         io.to(roomCode).emit(
             "playerJoined",
@@ -461,16 +516,21 @@ export function startGame(roomCode, socketId) {
         };
     }
 
-    if (room.players.length !== MAX_PLAYERS) {
+    const readyPlayers = room.replayQueue
+        ? room.players.filter((player) => player.ready)
+        : room.players;
+
+    if (readyPlayers.length !== MAX_PLAYERS) {
         return {
             success: false,
             message: `Exactly ${MAX_PLAYERS} players required.`,
         };
     }
-    resetGame(roomCode);
+    prepareNewRound(room);
     assignRoles(room);
 
     room.started = true;
+    room.replayQueue = false;
 
     // First night will increment this to Day 1
     room.day = 0;
@@ -484,6 +544,54 @@ export function startGame(roomCode, socketId) {
         message: "Game started.",
     };
 
+}
+function prepareNewRound(room) {
+    clearRoomTimer(room);
+
+    room.day = 0;
+    room.phase = PHASES.WAITING;
+    room.phaseEndTime = null;
+    room.publicVotes = {};
+    room.werewolfVotes = {};
+    room.werewolfTarget = null;
+    room.knightAction = null;
+    room.seerAction = null;
+    room.publicMessages = [];
+    room.werewolfMessages = [];
+
+    room.players.forEach((player) => {
+        player.role = null;
+        player.ready = false;
+        player.alive = true;
+        player.afk = false;
+    });
+}
+export function queueForNextRound(roomCode, socketId) {
+    const room = getRoom(roomCode);
+
+    if (!room || room.phase !== PHASES.ENDED) {
+        return { success: false, message: "The previous game has not ended." };
+    }
+
+    const player = getPlayerBySocket(room, socketId);
+    if (!player) {
+        return { success: false, message: "Player not found." };
+    }
+
+    if (!room.replayQueue) {
+        clearRoomTimer(room);
+        room.replayQueue = true;
+        room.publicMessages = [];
+        room.werewolfMessages = [];
+        room.players.forEach((roomPlayer) => {
+            roomPlayer.ready = false;
+        });
+    }
+
+    player.ready = true;
+    io.to(roomCode).emit("queueUpdated", getPublicPlayers(room));
+
+    return { success: true, players: getPublicPlayers(room) };
 }
 function startNight(roomCode) {
 
@@ -1069,6 +1177,7 @@ export function playerDisconnected(roomCode, socketId) {
     player.socketId = null;
 
     player.afk = true;
+    player.connected = false;
 
     if (player.alive) {
 
@@ -1099,7 +1208,11 @@ export function playerDisconnected(roomCode, socketId) {
 }
 function transferHost(roomCode, room) {
 
-    const nextHost = room.players.find(
+    const eligiblePlayers = room.replayQueue
+        ? room.players.filter((player) => player.ready)
+        : room.players;
+
+    const nextHost = eligiblePlayers.find(
         (player) => player.socketId !== null
     );
 
@@ -1143,6 +1256,7 @@ export function reconnectPlayer(
     player.socketId = socketId;
 
     player.afk = false;
+    player.connected = true;
 
     return true;
 
@@ -1157,6 +1271,8 @@ export function resetGame(roomCode) {
 
     room.started = false;
 
+    room.replayQueue = false;
+
     room.day = 0;
 
     room.phase = PHASES.WAITING;
@@ -1166,6 +1282,10 @@ export function resetGame(roomCode) {
     room.publicVotes = {};
 
     room.werewolfVotes = {};
+
+    // Each new round starts with a fresh public and werewolf chat history.
+    room.publicMessages = [];
+    room.werewolfMessages = [];
 
     room.werewolfTarget = {};
     room.knightAction = null;

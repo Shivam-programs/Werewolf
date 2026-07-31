@@ -28,6 +28,13 @@ input {
 button {
   cursor: pointer;
 }
+.chat-feed {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.chat-feed::-webkit-scrollbar {
+  display: none;
+}
 .font-display {
   font-family: var(--font-display);
   letter-spacing: -0.035em;

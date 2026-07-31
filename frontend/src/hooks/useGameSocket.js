@@ -6,7 +6,7 @@ import { useGameStore } from "../store/gameStore";
 import { useGameSounds } from "./useGameSounds";
 
 export function useGameSocket() {
-  const { roomCode, playerName, ownRole, setPlayers, setPhase, setRole, addMessage, revealPlayerRole, setGameResult, resetRound } = useGameStore();
+  const { roomCode, playerName, ownRole, setPlayers, setHost, setRoomState, setPhase, setRole, addMessage, revealPlayerRole, setGameResult, resetRound } = useGameStore();
   const { play } = useGameSounds();
   useEffect(() => {
     if (!roomCode || !playerName) return undefined;
@@ -18,10 +18,18 @@ export function useGameSocket() {
       connect: register,
       disconnect: () => toast.error("Connection lost. Reconnecting..."),
       connect_error: () => toast.error("Unable to reach the game server."),
+      error: (message) => toast.error(message || "The server rejected that action."),
+      roomError: (message) => toast.error(message),
+      roomState: (result) => {
+        if (!result.success) return toast.error(result.message || "This room is no longer available.");
+        setRoomState(result.room);
+      },
       playerJoined: setPlayers,
       playerLeft: setPlayers,
       playerConnected: refreshPlayers,
       playerDisconnected: ({ players }) => setPlayers(players),
+      queueUpdated: setPlayers,
+      hostChanged: ({ host }) => setHost(host),
       phaseChanged: setPhase,
       roleAssigned: (data) => { setRole(data); },
       newPublicMessage: (message) => addMessage(message),
@@ -63,5 +71,5 @@ export function useGameSocket() {
     });
     refreshPlayers();
     return cleanup;
-  }, [roomCode, playerName, ownRole, setPlayers, setPhase, setRole, addMessage, revealPlayerRole, setGameResult, resetRound, play]);
+  }, [roomCode, playerName, ownRole, setPlayers, setHost, setRoomState, setPhase, setRole, addMessage, revealPlayerRole, setGameResult, resetRound, play]);
 }

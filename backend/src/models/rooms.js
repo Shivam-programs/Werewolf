@@ -1,30 +1,4 @@
-export const rooms = {
-    ABC123: {
-        host: null,
-
-        started: false,
-
-        phase: "waiting",
-
-        phaseEndTime: null,
-
-        timer: null,
-
-        day: 0,
-
-        players: [],
-
-        // Chat
-        publicMessages: [],
-        werewolfMessages: [],
-
-        // Voting
-        publicVotes: {},
-        werewolfVotes: {},
-
-        // Night actions
-        werewolfTarget: null,
-        knightAction: null,
-        seerAction: null,
-    },
-};
+// Active rooms currently live in this process. A production deployment should
+// replace this with a shared persistent store (for example Redis) if rooms must
+// survive a service restart or run across more than one instance.
+export const rooms = {};

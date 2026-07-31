@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { useGameStore } from "../../store/gameStore";
-import { socket } from "../../services/socket";
+import { ensureSocket, socket } from "../../services/socket";
 import { PlayerList } from "../../components/players/PlayerList";
 import { ChatPanel } from "../../components/chat/ChatPanel";
 import { ActionPanel } from "../../components/game/ActionPanel";
@@ -23,6 +24,7 @@ export default function Game() {
   const navigate = useNavigate();
   const { play, enable, disable } = useGameSounds();
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [joiningNextRound, setJoiningNextRound] = useState(false);
   const {
     roomCode,
     phase,
@@ -34,6 +36,7 @@ export default function Game() {
     gameResult,
     playerName,
     leave,
+    enterReplayQueue,
   } = useGameStore();
   useEffect(() => {
     if (["night", "day", "voting"].includes(phase)) play(phase);
@@ -48,6 +51,29 @@ export default function Game() {
     if (soundEnabled) disable();
     else enable();
     setSoundEnabled((enabled) => !enabled);
+  };
+  const playAgain = () => {
+    if (joiningNextRound) return;
+
+    if (!socket.connected) {
+      ensureSocket();
+      toast.error("Reconnecting to the game server. Please try again in a moment.");
+      return;
+    }
+
+    setJoiningNextRound(true);
+    socket.timeout(5_000).emit("queueForNextRound", { roomCode }, (error, result) => {
+      setJoiningNextRound(false);
+      if (error) {
+        toast.error("Could not join the next round. Please try again.");
+        return;
+      }
+      if (result?.success) {
+        enterReplayQueue();
+        return;
+      }
+      toast.error(result?.message || "Could not join the next round.");
+    });
   };
   return (
     <main className="game-shell">
@@ -115,7 +141,8 @@ export default function Game() {
       {ownRole && <RoleReveal key={roleRevealId} role={ownRole} Teammates={werewolfTeammates} />}
       <GameOver
         result={gameResult}
-        onPlayAgain={() => socket.emit("startGame", { roomCode })}
+        onPlayAgain={playAgain}
+        joiningNextRound={joiningNextRound}
         onHome={home}
       />
     </main>

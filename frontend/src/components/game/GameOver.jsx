@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "../ui/Button";
 
-export function GameOver({ result, onPlayAgain, onHome }) {
+export function GameOver({ result, onPlayAgain, joiningNextRound, onHome }) {
   return (
     <AnimatePresence>
       {result && (
@@ -36,7 +36,9 @@ export function GameOver({ result, onPlayAgain, onHome }) {
               ))}
             </div>
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
-              <Button onClick={onPlayAgain}>Play again</Button>
+              <Button onClick={onPlayAgain} loading={joiningNextRound} disabled={joiningNextRound}>
+                {joiningNextRound ? "Joining next round" : "Play again"}
+              </Button>
               <Button variant="ghost" onClick={onHome}>
                 Return home
               </Button>

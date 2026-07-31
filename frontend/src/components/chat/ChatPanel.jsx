@@ -9,7 +9,7 @@ function Feed({ messages, accent }) {
   }, [messages]);
   return (
     <div
-      className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1"
+      className="chat-feed min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain"
       aria-label="Chat messages"
     >
       {messages.length === 0 && (

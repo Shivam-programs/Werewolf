@@ -12,8 +12,9 @@ import {
     knightProtect,
     seerPeek,
     reconnectPlayer,
+    queueForNextRound,
     playerDisconnected,
-    getPublicPlayers
+    getRoomState,
 } from "../controllers/gameController.js";
 
 const app = express();
@@ -23,6 +24,7 @@ const allowedOrigins = [
     process.env.FRONTEND_URL,
     "http://localhost:5173",
     "http://localhost:5174",
+    "https://werewolf-jloc.onrender.com"
 ].filter(Boolean);
 
 const io = new Server(server, {
@@ -43,6 +45,8 @@ socket.id
 */
 
 const socketMap = {};
+const disconnectTimers = new Map();
+const RECONNECT_GRACE_MS = 20_000;
 
 io.on("connection", (socket) => {
 
@@ -55,6 +59,28 @@ io.on("connection", (socket) => {
     socket.on(        "registerPlayer",
         ({ roomCode, playerName }) => {
 
+            if (typeof roomCode !== "string" || typeof playerName !== "string") {
+                socket.emit("roomError", "Invalid room registration.");
+                return;
+            }
+
+            const reconnectResult = reconnectPlayer(
+                roomCode,
+                playerName,
+                socket.id
+            );
+
+            if (!reconnectResult) {
+                socket.emit("roomError", "This room is no longer available.");
+                return;
+            }
+
+            const pendingDisconnect = disconnectTimers.get(`${roomCode}:${playerName}`);
+            if (pendingDisconnect) {
+                clearTimeout(pendingDisconnect);
+                disconnectTimers.delete(`${roomCode}:${playerName}`);
+            }
+
             socket.join(roomCode);
 
             socket.data.roomCode = roomCode;
@@ -65,11 +91,7 @@ io.on("connection", (socket) => {
                 playerName,
             };
 
-            reconnectPlayer(
-                roomCode,
-                playerName,
-                socket.id
-            );
+            socket.emit("roomState", getRoomState(roomCode, socket.id));
 
             io.to(roomCode).emit(
                 "playerConnected",
@@ -89,6 +111,13 @@ io.on("connection", (socket) => {
         if (!result.success) {
             socket.emit("error", result.message);
         }
+    });
+
+    socket.on("queueForNextRound", ({ roomCode }, callback) => {
+        const result = queueForNextRound(roomCode, socket.id);
+
+        if (callback) callback(result);
+        if (!result.success) socket.emit("error", result.message);
     });
 
 
@@ -194,10 +223,16 @@ io.on("connection", (socket) => {
 
         if (player) {
 
-            playerDisconnected(
-                player.roomCode,
-                socket.id
-            );
+            const timerKey = `${player.roomCode}:${player.playerName}`;
+            const existingTimer = disconnectTimers.get(timerKey);
+            if (existingTimer) clearTimeout(existingTimer);
+
+            const disconnectTimer = setTimeout(() => {
+                playerDisconnected(player.roomCode, socket.id);
+                disconnectTimers.delete(timerKey);
+            }, RECONNECT_GRACE_MS);
+
+            disconnectTimers.set(timerKey, disconnectTimer);
 
             delete socketMap[socket.id];
 
