@@ -13,6 +13,7 @@ function Room() {
   useGameSocket();
   if (!roomCode) return <Navigate to="/" replace />;
   const exit = () => {
+    socket.emit("leaveRoom", { roomCode, playerName: useGameStore.getState().playerName });
     socket.disconnect();
     leave();
     navigate("/");

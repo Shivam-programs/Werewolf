@@ -26,8 +26,9 @@ export function ActionPanel() {
     markVoteSubmitted,
   } = useGameStore();
   const [selected, setSelected] = useState("");
-  const alivePlayers = players.filter((player) => player.alive !== false);
-  const currentPlayer = players.find((player) => player.name === playerName);
+  const activePlayers = players.filter((player) => player.connected !== false && !player.afk);
+  const alivePlayers = activePlayers.filter((player) => player.alive !== false);
+  const currentPlayer = activePlayers.find((player) => player.name === playerName);
   const isAlive = currentPlayer?.alive !== false;
   const eligibleTargets =
     phase === "night" && ownRole === "Werewolf"
@@ -129,7 +130,7 @@ export function ActionPanel() {
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {eligibleTargets.map((player) => {
-          const playerNumber = players.findIndex(({ name }) => name === player.name) + 1;
+          const playerNumber = activePlayers.findIndex(({ name }) => name === player.name) + 1;
 
           return (
             <button

@@ -15,10 +15,12 @@ export function Button({
   className = "",
   loading,
   disabled,
+  type = "button",
   ...props
 }) {
   return (
     <motion.button
+      type={type}
       whileHover={{ y: -1 }}
       whileTap={{ scale: 0.98 }}
       disabled={disabled || loading}

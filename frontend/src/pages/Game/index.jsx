@@ -43,6 +43,7 @@ export default function Game() {
   }, [phase, play]);
   const [title, icon, description] = phaseLabels[phase] || phaseLabels.waiting;
   const home = () => {
+    socket.emit("leaveRoom", { roomCode, playerName });
     socket.disconnect();
     leave();
     navigate("/");
@@ -57,23 +58,27 @@ export default function Game() {
 
     if (!socket.connected) {
       ensureSocket();
-      toast.error("Reconnecting to the game server. Please try again in a moment.");
+      toast.error(
+        "Reconnecting to the game server. Please try again in a moment.",
+      );
       return;
     }
 
     setJoiningNextRound(true);
-    socket.timeout(5_000).emit("queueForNextRound", { roomCode }, (error, result) => {
-      setJoiningNextRound(false);
-      if (error) {
-        toast.error("Could not join the next round. Please try again.");
-        return;
-      }
-      if (result?.success) {
-        enterReplayQueue();
-        return;
-      }
-      toast.error(result?.message || "Could not join the next round.");
-    });
+    socket
+      .timeout(5_000)
+      .emit("queueForNextRound", { roomCode }, (error, result) => {
+        setJoiningNextRound(false);
+        if (error) {
+          toast.error("Could not join the next round. Please try again.");
+          return;
+        }
+        if (result?.success) {
+          enterReplayQueue();
+          return;
+        }
+        toast.error(result?.message || "Could not join the next round.");
+      });
   };
   return (
     <main className="game-shell">
@@ -92,7 +97,9 @@ export default function Game() {
               type="button"
               onClick={toggleSound}
               aria-pressed={!soundEnabled}
-              aria-label={soundEnabled ? "Mute game sounds" : "Enable game sounds"}
+              aria-label={
+                soundEnabled ? "Mute game sounds" : "Enable game sounds"
+              }
               title={soundEnabled ? "Mute sounds" : "Enable sounds"}
               className="rounded-lg border border-white/10 bg-white/3 px-2.5 py-1.5 text-xs font-bold text-zinc-200 transition hover:border-amber-200/40 hover:bg-white/7"
             >
@@ -138,7 +145,13 @@ export default function Game() {
           <ChatPanel />
         </div>
       </div>
-      {ownRole && <RoleReveal key={roleRevealId} role={ownRole} Teammates={werewolfTeammates} />}
+      {ownRole && (
+        <RoleReveal
+          key={roleRevealId}
+          role={ownRole}
+          Teammates={werewolfTeammates}
+        />
+      )}
       <GameOver
         result={gameResult}
         onPlayAgain={playAgain}

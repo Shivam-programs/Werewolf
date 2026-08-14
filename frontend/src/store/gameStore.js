@@ -3,12 +3,13 @@ import { create } from "zustand";
 const savedSession = JSON.parse(sessionStorage.getItem("howl-hollow-session") || "null");
 
 const persist = (state) => sessionStorage.setItem("howl-hollow-session", JSON.stringify({
-  roomCode: state.roomCode, playerName: state.playerName,
+  roomCode: state.roomCode, playerName: state.playerName, playerId: state.playerId,
 }));
 
 export const useGameStore = create((set) => ({
   roomCode: savedSession?.roomCode || "",
   playerName: savedSession?.playerName || "",
+  playerId: savedSession?.playerId || "",
   players: [],
   host: "",
   phase: "waiting",
@@ -23,8 +24,8 @@ export const useGameStore = create((set) => ({
   voteSubmitted: false,
   actionSubmitted: false,
   gameResult: null,
-  setSession: ({ roomCode, playerName, players = [], host = playerName }) => set((state) => {
-    const next = { ...state, roomCode, playerName, players, host };
+  setSession: ({ roomCode, playerName, playerId = "", players = [], host = playerName }) => set((state) => {
+    const next = { ...state, roomCode, playerName, playerId, players, host };
     persist(next);
     return next;
   }),
@@ -76,6 +77,6 @@ export const useGameStore = create((set) => ({
   }),
   leave: () => {
     sessionStorage.removeItem("howl-hollow-session");
-    set({ roomCode: "", playerName: "", players: [], host: "", phase: "waiting", day: 0, phaseEndTime: null, ownRole: null, werewolfTeammates: [], revealedRoles: {}, messages: [], werewolfMessages: [], voteSubmitted: false, actionSubmitted: false, gameResult: null });
+    set({ roomCode: "", playerName: "", playerId: "", players: [], host: "", phase: "waiting", day: 0, phaseEndTime: null, ownRole: null, werewolfTeammates: [], revealedRoles: {}, messages: [], werewolfMessages: [], voteSubmitted: false, actionSubmitted: false, gameResult: null });
   },
 }));

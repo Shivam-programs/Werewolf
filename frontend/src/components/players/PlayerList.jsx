@@ -3,21 +3,22 @@ import { useGameStore } from "../../store/gameStore";
 
 export function PlayerList({ waiting = false }) {
   const { players, playerName, host, ownRole, werewolfTeammates, revealedRoles } = useGameStore();
+  const visiblePlayers = players.filter((player) => player.connected !== false && !player.afk);
   return (
     <section className="panel flex min-h-0 flex-col p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <p className="eyebrow">The village</p>
           <h2 className="font-display text-xl text-zinc-50">
-            Players <span className="text-zinc-500">{players.length}/7</span>
+            Players <span className="text-zinc-500">{visiblePlayers.length}/7</span>
           </h2>
         </div>
         <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs text-zinc-400">
-          {players.filter((p) => p.alive !== false).length} alive
+          {visiblePlayers.filter((p) => p.alive !== false).length} alive
         </span>
       </div>
       <div className="space-y-2 overflow-auto pr-1">
-        {players.map((player, index) => {
+        {visiblePlayers.map((player, index) => {
           const revealedRole = revealedRoles[player.name];
           const teammateRole =
             ownRole === "Werewolf" && werewolfTeammates.includes(player.name)
@@ -66,7 +67,7 @@ export function PlayerList({ waiting = false }) {
             </motion.div>
           );
         })}
-        {Array.from({ length: Math.max(0, 7 - players.length) }).map((_, i) => (
+        {Array.from({ length: Math.max(0, 7 - visiblePlayers.length) }).map((_, i) => (
           <div
             key={`empty-${i}`}
             className="flex h-14.5items-center gap-3 rounded-xl border border-dashed border-white/7 px-3 text-sm text-zinc-600"

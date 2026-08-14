@@ -14,7 +14,9 @@ import {
     reconnectPlayer,
     queueForNextRound,
     playerDisconnected,
+    removeDisconnectedPlayer,
     getRoomState,
+    leaveRoom,
 } from "../controllers/gameController.js";
 
 const app = express();
@@ -34,17 +36,6 @@ const io = new Server(server, {
     },
 });
 
-/*
-socket.id
-        ↓
-{
-    socketId :
-    roomCode :
-    playerName :
-}
-*/
-
-const socketMap = {};
 const disconnectTimers = new Map();
 const RECONNECT_GRACE_MS = 20_000;
 
@@ -56,50 +47,43 @@ io.on("connection", (socket) => {
     Register player after joining room
     */
 
-    socket.on(        "registerPlayer",
-        ({ roomCode, playerName }) => {
+    socket.on("registerPlayer", ({ roomCode, playerName, playerId }) => {
 
-            if (typeof roomCode !== "string" || typeof playerName !== "string") {
-                socket.emit("roomError", "Invalid room registration.");
-                return;
-            }
-
-            const reconnectResult = reconnectPlayer(
-                roomCode,
-                playerName,
-                socket.id
-            );
-
-            if (!reconnectResult) {
-                socket.emit("roomError", "This room is no longer available.");
-                return;
-            }
-
-            const pendingDisconnect = disconnectTimers.get(`${roomCode}:${playerName}`);
-            if (pendingDisconnect) {
-                clearTimeout(pendingDisconnect);
-                disconnectTimers.delete(`${roomCode}:${playerName}`);
-            }
-
-            socket.join(roomCode);
-
-            socket.data.roomCode = roomCode;
-            socket.data.playerName = playerName;
-
-            socketMap[socket.id] = {
-                roomCode,
-                playerName,
-            };
-
-            socket.emit("roomState", getRoomState(roomCode, socket.id));
-
-            io.to(roomCode).emit(
-                "playerConnected",
-                playerName
-            );
-
+        if (typeof roomCode !== "string" || typeof playerName !== "string") {
+            socket.emit("roomError", "Invalid room registration.");
+            return;
         }
-    );
+
+        const reconnectResult = reconnectPlayer(
+            roomCode,
+            playerName,
+            socket.id,
+            playerId || null
+        );
+
+        if (!reconnectResult.success) {
+            socket.emit("roomError", "This room is no longer available.");
+            return;
+        }
+
+        const pendingDisconnect = disconnectTimers.get(`${roomCode}:${reconnectResult.playerId}`);
+        if (pendingDisconnect) {
+            clearTimeout(pendingDisconnect);
+            disconnectTimers.delete(`${roomCode}:${reconnectResult.playerId}`);
+        }
+
+        socket.join(roomCode);
+
+        socket.data.roomCode = roomCode;
+        socket.data.playerName = playerName;
+        socket.data.playerId = reconnectResult.playerId;
+
+        console.log(`[PLAYER] REGISTERED room=${roomCode} player=${playerName} playerId=${reconnectResult.playerId} socketId=${socket.id}`);
+
+        socket.emit("roomState", getRoomState(roomCode, socket.id));
+
+        io.to(roomCode).emit("playerConnected", playerName);
+    });
 
     /*
     Host starts game
@@ -111,6 +95,25 @@ io.on("connection", (socket) => {
         if (!result.success) {
             socket.emit("error", result.message);
         }
+    });
+
+    socket.on("leaveRoom", ({ roomCode, playerName }) => {
+        if (typeof roomCode !== "string" || typeof playerName !== "string") {
+            return;
+        }
+
+        const timerKey = `${roomCode}:${socket.data?.playerId || playerName}`;
+        const pendingDisconnect = disconnectTimers.get(timerKey);
+        if (pendingDisconnect) {
+            clearTimeout(pendingDisconnect);
+            disconnectTimers.delete(timerKey);
+        }
+
+        leaveRoom(roomCode, playerName, socket.id, socket.data?.playerId || null);
+        socket.leave(roomCode);
+        socket.data.roomCode = null;
+        socket.data.playerName = null;
+        socket.data.playerId = null;
     });
 
     socket.on("queueForNextRound", ({ roomCode }, callback) => {
@@ -189,21 +192,13 @@ io.on("connection", (socket) => {
         "seerPeek",
         ({ roomCode, target }, callback) => {
 
-            const result =
-                seerPeek(
-                    roomCode,
-                    socket.id,
-                    target
-                );
+            const result = seerPeek(roomCode, socket.id, target);
 
-            if (callback) {
-                callback(result);
-            }
-
-            socket.emit(
-                "seerResult",
-                result
-            );
+            // Emit the seer result to the requesting socket only.
+            // Do NOT also call the callback to avoid delivering the same
+            // success notification twice (callback + event). The client
+            // will handle the private `seerResult` event.
+            socket.emit("seerResult", result);
 
         }
     );
@@ -213,31 +208,23 @@ io.on("connection", (socket) => {
     */
 
     socket.on("disconnect", () => {
+        const roomCode = socket.data?.roomCode;
+        const playerId = socket.data?.playerId;
 
-        console.log(
-            `Disconnected : ${socket.id}`
-        );
+        console.log(`[PLAYER] DISCONNECTED room=${roomCode || "unknown"} playerId=${playerId || "unknown"} socketId=${socket.id}`);
 
-        const player =
-            socketMap[socket.id];
+        if (!roomCode || !playerId) return;
 
-        if (player) {
+        const timerKey = `${roomCode}:${playerId}`;
+        const existingTimer = disconnectTimers.get(timerKey);
+        if (existingTimer) clearTimeout(existingTimer);
 
-            const timerKey = `${player.roomCode}:${player.playerName}`;
-            const existingTimer = disconnectTimers.get(timerKey);
-            if (existingTimer) clearTimeout(existingTimer);
+        const disconnectTimer = setTimeout(() => {
+            removeDisconnectedPlayer(roomCode, socket.id, playerId);
+            disconnectTimers.delete(timerKey);
+        }, RECONNECT_GRACE_MS);
 
-            const disconnectTimer = setTimeout(() => {
-                playerDisconnected(player.roomCode, socket.id);
-                disconnectTimers.delete(timerKey);
-            }, RECONNECT_GRACE_MS);
-
-            disconnectTimers.set(timerKey, disconnectTimer);
-
-            delete socketMap[socket.id];
-
-        }
-
+        disconnectTimers.set(timerKey, disconnectTimer);
     });
 
 });

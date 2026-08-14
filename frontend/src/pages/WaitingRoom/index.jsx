@@ -7,7 +7,8 @@ import { Button } from "../../components/ui/Button";
 export default function WaitingRoom({ onLeave }) {
   const { roomCode, players, playerName, host } = useGameStore();
   const isHost = host === playerName;
-  const ready = players.length === 7;
+  const activePlayers = players.filter((player) => player.connected && !player.afk);
+  const ready = activePlayers.length === 7;
   const copy = async () => {
     await navigator.clipboard?.writeText(roomCode);
     toast.success("Room code copied.");
@@ -57,7 +58,7 @@ export default function WaitingRoom({ onLeave }) {
                 {isHost
                   ? ready
                     ? "The village is complete."
-                    : `Waiting for ${7 - players.length} more player${7 - players.length === 1 ? "" : "s"}.`
+                    : `Waiting for ${7 - activePlayers.length} more player${7 - activePlayers.length === 1 ? "" : "s"}.`
                   : "Waiting for the host to begin..."}
               </p>
               <p className="mt-2 text-xs text-zinc-500">
@@ -67,6 +68,7 @@ export default function WaitingRoom({ onLeave }) {
               </p>
               {isHost && (
                 <Button
+                  type="button"
                   onClick={start}
                   disabled={!ready}
                   className="mt-5 w-full"

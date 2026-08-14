@@ -34,6 +34,7 @@ export default function Home() {
       setSession({
         roomCode: code,
         playerName,
+        playerId: response.playerId || "",
         players: room?.players || [],
         host: room?.host || playerName,
       });
