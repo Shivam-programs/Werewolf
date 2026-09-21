@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +19,34 @@ const phaseLabels = {
   ended: ["Ended", "✦", "The truth is known."],
   waiting: ["Waiting", "◌", "The village is gathering."],
 };
+
+// ---------------------------------------------------------------------------
+// Connection status banner
+// ---------------------------------------------------------------------------
+
+function ConnectionBanner() {
+  const status = useGameStore((s) => s.connectionStatus);
+  if (status === "connected") return null;
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-yellow-500/90 px-4 py-2 text-sm font-bold text-zinc-950 backdrop-blur-sm"
+      >
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-950 border-t-transparent" />
+        {status === "reconnecting"
+          ? "Reconnecting to the game server…"
+          : "Connection lost. Attempting to reconnect…"}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Game page
+// ---------------------------------------------------------------------------
 
 export default function Game() {
   const navigate = useNavigate();
@@ -82,6 +110,7 @@ export default function Game() {
   };
   return (
     <main className="game-shell">
+      <ConnectionBanner />
       <div className="mx-auto max-w-[1600px] px-4 py-4 sm:px-6 sm:py-6">
         <header className="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -101,15 +130,16 @@ export default function Game() {
                 soundEnabled ? "Mute game sounds" : "Enable game sounds"
               }
               title={soundEnabled ? "Mute sounds" : "Enable sounds"}
-              className="rounded-lg border border-white/10 bg-white/3 px-2.5 py-1.5 text-xs font-bold text-zinc-200 transition hover:border-amber-200/40 hover:bg-white/7"
+              className="rounded-lg border border-white/10 bg-white/[.03] px-2.5 py-1.5 text-xs font-bold text-zinc-200 transition hover:border-amber-200/40 hover:bg-white/[.07]"
             >
               {soundEnabled ? "🔊 Sound on" : "🔇 Sound off"}
             </button>
             <span className="hidden text-xs text-zinc-500 sm:inline">
               You are <b className="text-zinc-200">{playerName}</b>
             </span>
+            {/* FIX B15: Fixed stray bracket in class: was "bg-amber-200/5]" */}
             {ownRole && (
-              <span className="rounded-full border border-amber-200/20 bg-amber-200/5] px-3 py-1.5 text-xs font-bold text-amber-100">
+              <span className="rounded-full border border-amber-200/20 bg-amber-200/[.05] px-3 py-1.5 text-xs font-bold text-amber-100">
                 {ownRole}
               </span>
             )}

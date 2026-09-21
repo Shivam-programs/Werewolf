@@ -26,7 +26,7 @@ export function GameOver({ result, onPlayAgain, joiningNextRound, onHome }) {
               {result.players?.map((player) => (
                 <div
                   key={player.name}
-                  className="rounded-xl border border-white/8 bg-white/3 p-3"
+                  className="rounded-xl border border-white/8 bg-white/[.03] p-3"
                 >
                   <p className="truncate text-sm font-bold text-zinc-200">
                     {player.name}

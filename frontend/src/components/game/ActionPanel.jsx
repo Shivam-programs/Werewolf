@@ -26,9 +26,9 @@ export function ActionPanel() {
     markVoteSubmitted,
   } = useGameStore();
   const [selected, setSelected] = useState("");
-  const activePlayers = players.filter((player) => player.connected !== false && !player.afk);
-  const alivePlayers = activePlayers.filter((player) => player.alive !== false);
-  const currentPlayer = activePlayers.find((player) => player.name === playerName);
+  // Include all alive players for targeting (even disconnected ones — server validates)
+  const alivePlayers = players.filter((player) => player.alive !== false);
+  const currentPlayer = players.find((player) => player.name === playerName);
   const isAlive = currentPlayer?.alive !== false;
   const eligibleTargets =
     phase === "night" && ownRole === "Werewolf"
@@ -130,20 +130,24 @@ export function ActionPanel() {
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {eligibleTargets.map((player) => {
-          const playerNumber = activePlayers.findIndex(({ name }) => name === player.name) + 1;
+          const playerNumber = players.findIndex(({ name }) => name === player.name) + 1;
+          const isDisconnected = player.afk || player.connected === false;
 
           return (
             <button
             disabled={submitted}
             onClick={() => setSelected(player.name)}
             key={player.name}
-            className={`rounded-xl border p-3 text-left text-sm transition ${selectedTarget === player.name ? "border-amber-300 bg-amber-300/10 text-amber-100" : "border-white/8 bg-white/2.5]text-zinc-300 hover:border-white/20"}`}
+            className={`rounded-xl border p-3 text-left text-sm transition ${selectedTarget === player.name ? "border-amber-300 bg-amber-300/10 text-amber-100" : "border-white/8 bg-white/[.025] text-zinc-300 hover:border-white/20"}`}
           >
             <span className="mb-2 grid h-7 w-7 place-items-center rounded-md bg-black/20 text-xs font-bold">
               {playerNumber}
             </span>
             <span className="flex items-center justify-between gap-2">
-              {player.name}
+              <span className="truncate">
+                {player.name}
+                {isDisconnected && <span className="ml-1 text-xs text-yellow-300">⚡</span>}
+              </span>
               {submitted && selectedTarget === player.name && (
                 <span aria-label="Selected" className="text-base text-emerald-300">
                   ✓

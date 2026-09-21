@@ -24,6 +24,11 @@ export const useGameStore = create((set) => ({
   voteSubmitted: false,
   actionSubmitted: false,
   gameResult: null,
+
+  // Connection status: "connected" | "disconnected" | "reconnecting"
+  connectionStatus: "disconnected",
+  setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
+
   setSession: ({ roomCode, playerName, playerId = "", players = [], host = playerName }) => set((state) => {
     const next = { ...state, roomCode, playerName, playerId, players, host };
     persist(next);
@@ -31,7 +36,7 @@ export const useGameStore = create((set) => ({
   }),
   setPlayers: (players) => set({ players }),
   setHost: (host) => set({ host }),
-  setRoomState: ({ host, phase, day, endsAt, players, role, teammates }) => set((state) => ({
+  setRoomState: ({ host, phase, day, endsAt, players, role, teammates, messages, werewolfMessages }) => set((state) => ({
     host,
     phase,
     day,
@@ -40,6 +45,9 @@ export const useGameStore = create((set) => ({
     ownRole: role,
     werewolfTeammates: teammates || [],
     roleRevealId: role && role !== state.ownRole ? state.roleRevealId + 1 : state.roleRevealId,
+    // Restore chat history on reconnect (only if the server sent messages)
+    ...(messages ? { messages } : {}),
+    ...(werewolfMessages ? { werewolfMessages } : {}),
   })),
   setPhase: ({ phase, day, endsAt }) => set({ phase, day, phaseEndTime: endsAt || null, voteSubmitted: false, actionSubmitted: false }),
   setRole: ({ role, teammates = [] }) => set((state) => ({ ownRole: role, werewolfTeammates: teammates, revealedRoles: {}, roleRevealId: state.roleRevealId + 1 })),
@@ -77,6 +85,6 @@ export const useGameStore = create((set) => ({
   }),
   leave: () => {
     sessionStorage.removeItem("howl-hollow-session");
-    set({ roomCode: "", playerName: "", playerId: "", players: [], host: "", phase: "waiting", day: 0, phaseEndTime: null, ownRole: null, werewolfTeammates: [], revealedRoles: {}, messages: [], werewolfMessages: [], voteSubmitted: false, actionSubmitted: false, gameResult: null });
+    set({ roomCode: "", playerName: "", playerId: "", players: [], host: "", phase: "waiting", day: 0, phaseEndTime: null, ownRole: null, werewolfTeammates: [], revealedRoles: {}, messages: [], werewolfMessages: [], voteSubmitted: false, actionSubmitted: false, gameResult: null, connectionStatus: "disconnected" });
   },
 }));

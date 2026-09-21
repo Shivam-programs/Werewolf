@@ -20,7 +20,7 @@ function Feed({ messages, accent }) {
       {messages.map((message, index) => (
         <div key={`${message.timestamp}-${index}`}>
           <p className={`mb-1 text-xs font-bold ${accent}`}>{message.sender}</p>
-          <p className="rounded-xl rounded-tl-sm bg-white/.045 px-3 py-2 text-sm leading-relaxed text-zinc-300">
+          <p className="rounded-xl rounded-tl-sm bg-white/[.045] px-3 py-2 text-sm leading-relaxed text-zinc-300">
             {message.message}
           </p>
         </div>
