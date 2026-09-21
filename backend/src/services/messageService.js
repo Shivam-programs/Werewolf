@@ -1,13 +1,12 @@
 // services/messageService.js
 
-import {rooms} from "../models/rooms.js";
+import { rooms } from "../models/rooms.js";
 import { io } from "../lib/socket.js";
 import { getPlayerBySocket } from "../controllers/gameController.js";
-export function sendPublicMessage(
-    roomCode,
-    socketId,
-    message
-) {
+
+const MAX_MESSAGE_LENGTH = 500;
+
+export function sendPublicMessage(roomCode, socketId, message) {
     const room = rooms[roomCode];
 
     if (!room) {
@@ -16,6 +15,16 @@ export function sendPublicMessage(
             message: "Room not found.",
         };
     }
+
+    // Validate and trim the message
+    if (typeof message !== "string" || !message.trim()) {
+        return {
+            success: false,
+            message: "Message cannot be empty.",
+        };
+    }
+
+    const trimmedMessage = message.trim().slice(0, MAX_MESSAGE_LENGTH);
 
     const player = room.players.find(
         (player) => player.socketId === socketId
@@ -37,7 +46,7 @@ export function sendPublicMessage(
 
     const newMessage = {
         sender: player.name,
-        message,
+        message: trimmedMessage,
         timestamp: Date.now(),
     };
 
@@ -52,11 +61,8 @@ export function sendPublicMessage(
         success: true,
     };
 }
-export function sendWerewolfMessage(
-    roomCode,
-    socketId,
-    message
-) {
+
+export function sendWerewolfMessage(roomCode, socketId, message) {
 
     const room = rooms[roomCode];
 
@@ -66,6 +72,16 @@ export function sendWerewolfMessage(
             message: "Room not found.",
         };
     }
+
+    // Validate and trim the message
+    if (typeof message !== "string" || !message.trim()) {
+        return {
+            success: false,
+            message: "Message cannot be empty.",
+        };
+    }
+
+    const trimmedMessage = message.trim().slice(0, MAX_MESSAGE_LENGTH);
 
     const sender = getPlayerBySocket(
         room,
@@ -95,7 +111,7 @@ export function sendWerewolfMessage(
 
     const newMessage = {
         sender: sender.name,
-        message,
+        message: trimmedMessage,
         timestamp: Date.now(),
     };
 

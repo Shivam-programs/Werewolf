@@ -17,6 +17,10 @@ const NIGHT_DURATION = 60 * 1000;
 const DAY_DURATION = 60 * 1000;
 const VOTING_DURATION = 30 * 1000;
 
+// ---------------------------------------------------------------------------
+// Lookup helpers
+// ---------------------------------------------------------------------------
+
 function getRoom(roomCode) {
     return rooms[roomCode] || null;
 }
@@ -37,13 +41,21 @@ function getActivePlayers(room) {
     return room.players.filter((player) => player.connected && Boolean(player.socketId) && !player.afk);
 }
 
+function getConnectedPlayers(room) {
+    return room.players.filter((player) => player.connected && !player.afk);
+}
+
 function getRoomOccupancy(room) {
     return {
         activePlayers: room.players.filter((player) => player.connected && !player.afk).length,
-        disconnectedPlayers: room.players.filter((player) => !player.connected && player.afk).length,
+        disconnectedPlayers: room.players.filter((player) => !player.connected || player.afk).length,
         totalPlayers: room.players.length,
     };
 }
+
+// ---------------------------------------------------------------------------
+// Public player list (safe to send to clients — never includes socketId)
+// ---------------------------------------------------------------------------
 
 export function getPublicPlayers(room) {
     const visiblePlayers = room.replayQueue
@@ -59,6 +71,10 @@ export function getPublicPlayers(room) {
         ready: player.ready,
     }));
 }
+
+// ---------------------------------------------------------------------------
+// Full room state for a specific player (sent on connect/reconnect)
+// ---------------------------------------------------------------------------
 
 export function getRoomState(roomCode, socketId) {
     const room = getRoom(roomCode);
@@ -88,9 +104,18 @@ export function getRoomState(roomCode, socketId) {
                     .filter((otherPlayer) => otherPlayer.role === "Werewolf" && otherPlayer.name !== player.name)
                     .map((otherPlayer) => otherPlayer.name)
                 : [],
+            // Include chat history so a reconnecting player can restore their chat
+            messages: room.publicMessages || [],
+            werewolfMessages: room.started && player.role === "Werewolf"
+                ? (room.werewolfMessages || [])
+                : [],
         },
     };
 }
+
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
 
 function getAlivePlayer(room, playerName) {
     return room.players.find((player) => player.name === playerName && player.alive);
@@ -190,14 +215,19 @@ function hasSubmittedVote(votes, playerName) {
     return Object.prototype.hasOwnProperty.call(votes || {}, playerName);
 }
 
+// FIX B9: Exclude disconnected (afk) players from vote completion check
 function haveAllLivingPlayersVoted(room) {
-    const livingPlayers = room.players.filter((player) => player.alive);
+    const votingPlayers = room.players.filter((player) => player.alive && player.connected && !player.afk);
 
-    return livingPlayers.length > 0 && livingPlayers.every((player) => hasSubmittedVote(room.publicVotes, player.name));
+    return votingPlayers.length > 0 && votingPlayers.every((player) => hasSubmittedVote(room.publicVotes, player.name));
 }
 
+// FIX B8: Exclude disconnected (afk) players from night action completion check
+// FIX B4: Compare seerAction.seer against player.name (stable) instead of socketId
 function haveAllLivingNightRolesActed(room) {
-    const requiredActors = room.players.filter((player) => player.alive && ["Werewolf", "Knight", "Seer"].includes(player.role));
+    const requiredActors = room.players.filter(
+        (player) => player.alive && player.connected && !player.afk && ["Werewolf", "Knight", "Seer"].includes(player.role)
+    );
 
     return requiredActors.every((player) => {
         if (player.role === "Werewolf") {
@@ -208,9 +238,14 @@ function haveAllLivingNightRolesActed(room) {
             return Boolean(room.knightAction);
         }
 
-        return room.seerAction?.seer === player.socketId;
+        // FIX B4: Use player.name (stable) instead of socketId
+        return room.seerAction?.seer === player.name;
     });
 }
+
+// ---------------------------------------------------------------------------
+// Role assignment
+// ---------------------------------------------------------------------------
 
 function assignRoles(room) {
     const shuffledRoles = [...roles];
@@ -242,6 +277,10 @@ function sendRoles(roomCode, room) {
         socket.emit("roleAssigned", data);
     });
 }
+
+// ---------------------------------------------------------------------------
+// Room creation & joining
+// ---------------------------------------------------------------------------
 
 function createRoom(playerName) {
     return {
@@ -288,6 +327,14 @@ export function createGameRoom(roomCode, playerName) {
 
     const trimmedName = playerName.trim();
 
+    if (!trimmedName) {
+        return {
+            success: false,
+            statusCode: 400,
+            message: "Player name cannot be empty.",
+        };
+    }
+
     if (rooms[roomCode]) {
         return {
             success: false,
@@ -299,7 +346,7 @@ export function createGameRoom(roomCode, playerName) {
     rooms[roomCode] = createRoom(trimmedName);
 
     console.log(
-        `[ROOM_CREATE] room=${roomCode} host=${trimmedName} activePlayers=1 disconnectedPlayers=0 totalPlayers=1 maxPlayers=${MAX_PLAYERS}`,
+        `[ROOM] CREATED room=${roomCode} host=${trimmedName} activePlayers=1 disconnectedPlayers=0 totalPlayers=1 maxPlayers=${MAX_PLAYERS}`,
     );
 
     return {
@@ -335,7 +382,7 @@ export function joinRoom(roomCode, playerName) {
     if (room) {
         const { activePlayers, disconnectedPlayers, totalPlayers } = getRoomOccupancy(room);
         console.log(
-            `[JOIN_ATTEMPT] room=${roomCode} roomStatus=${room.started ? "PLAYING" : "WAITING"} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers} maxPlayers=${MAX_PLAYERS}`,
+            `[ROOM] JOIN_ATTEMPT room=${roomCode} roomStatus=${room.started ? "PLAYING" : "WAITING"} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers} maxPlayers=${MAX_PLAYERS}`,
         );
     }
 
@@ -371,7 +418,7 @@ export function joinRoom(roomCode, playerName) {
     if (room.players.length >= MAX_PLAYERS) {
         const { activePlayers, disconnectedPlayers, totalPlayers } = getRoomOccupancy(room);
         console.log(
-            `[ROOM_FULL] room=${roomCode} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers} maxPlayers=${MAX_PLAYERS}`,
+            `[ROOM] FULL room=${roomCode} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers} maxPlayers=${MAX_PLAYERS}`,
         );
         return {
             success: false,
@@ -380,6 +427,7 @@ export function joinRoom(roomCode, playerName) {
         };
     }
 
+    // FIX B11: Synchronous guard against duplicate player names
     if (room.players.some((player) => player.name === trimmedName)) {
         return {
             success: false,
@@ -407,7 +455,7 @@ export function joinRoom(roomCode, playerName) {
 
     const { activePlayers, disconnectedPlayers, totalPlayers } = getRoomOccupancy(room);
     console.log(
-        `[JOINED] room=${roomCode} player=${trimmedName} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers}`,
+        `[ROOM] JOINED room=${roomCode} player=${trimmedName} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers}`,
     );
 
     return {
@@ -417,6 +465,10 @@ export function joinRoom(roomCode, playerName) {
         playerId: room.players[room.players.length - 1].playerId,
     };
 }
+
+// ---------------------------------------------------------------------------
+// Game start
+// ---------------------------------------------------------------------------
 
 export function startGame(roomCode, socketId) {
     const room = getRoom(roomCode);
@@ -453,7 +505,7 @@ export function startGame(roomCode, socketId) {
 
     const { activePlayers, disconnectedPlayers, totalPlayers } = getRoomOccupancy(room);
     console.log(
-        `[START_REQUEST] room=${roomCode} host=${host.name} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers} replayQueue=${room.replayQueue}`,
+        `[GAME] START_REQUEST room=${roomCode} host=${host.name} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers} replayQueue=${room.replayQueue}`,
     );
 
     const readyPlayers = room.replayQueue
@@ -469,8 +521,6 @@ export function startGame(roomCode, socketId) {
 
     prepareNewRound(room);
     assignRoles(room);
-
-    console.log(`[GAME] START_REQUEST room=${roomCode} host=${host.name} activePlayers=${readyPlayers.length}`);
 
     room.started = true;
     room.replayQueue = false;
@@ -500,6 +550,8 @@ function prepareNewRound(room) {
     room.seerAction = null;
     room.publicMessages = [];
     room.werewolfMessages = [];
+    room.processingNight = false;
+    room.processingVoting = false;
 
     room.players.forEach((player) => {
         player.role = null;
@@ -508,6 +560,10 @@ function prepareNewRound(room) {
         player.afk = false;
     });
 }
+
+// ---------------------------------------------------------------------------
+// Replay queue (play again)
+// ---------------------------------------------------------------------------
 
 export function queueForNextRound(roomCode, socketId) {
     const room = getRoom(roomCode);
@@ -537,10 +593,14 @@ export function queueForNextRound(roomCode, socketId) {
     return { success: true, players: getPublicPlayers(room) };
 }
 
+// ---------------------------------------------------------------------------
+// Phase transitions
+// ---------------------------------------------------------------------------
+
 function startNight(roomCode) {
     const room = getRoom(roomCode);
 
-        if (!room || !room.started) return; // Ensure room exists and game has started
+    if (!room || !room.started) return;
 
     clearRoomTimer(room);
 
@@ -552,6 +612,7 @@ function startNight(roomCode) {
     room.werewolfTarget = null;
     room.knightAction = null;
     room.seerAction = null;
+    room.processingNight = false;
 
     emitPhase(roomCode, room);
 
@@ -565,6 +626,13 @@ function resolveNightActions(roomCode) {
 
     if (!room) return;
 
+    // FIX B6 (timer safety): If we're no longer in NIGHT, bail out to prevent
+    // a stale timer from corrupting the current phase.
+    if (room.phase !== PHASES.NIGHT) {
+        console.log(`[GAME] resolveNightActions skipped (phase=${room.phase}, expected=night) room=${roomCode}`);
+        return;
+    }
+
     if (room.processingNight) {
         console.log(`[GAME] resolveNightActions skipped (already processing) room=${roomCode}`);
         return;
@@ -572,53 +640,55 @@ function resolveNightActions(roomCode) {
 
     room.processingNight = true;
 
-    let eliminatedPlayer = null;
-    let protectedPlayerName = null;
+    // FIX B7: Use try/finally so the processing flag is always cleared
+    try {
+        let eliminatedPlayer = null;
+        let protectedPlayerName = null;
 
-    const votes = Object.values(room.werewolfVotes || {});
+        const votes = Object.values(room.werewolfVotes || {});
 
-    let targetName = null;
+        let targetName = null;
 
-    if (votes.length === 1) {
-        targetName = votes[0];
-    } else if (votes.length >= 2) {
-        if (votes[0] === votes[1]) {
+        if (votes.length === 1) {
             targetName = votes[0];
-        } else {
-            targetName = votes[Math.floor(Math.random() * votes.length)];
+        } else if (votes.length >= 2) {
+            if (votes[0] === votes[1]) {
+                targetName = votes[0];
+            } else {
+                targetName = votes[Math.floor(Math.random() * votes.length)];
+            }
         }
-    }
 
-    const target = getAlivePlayer(room, targetName);
-    const protectedPlayer = getAlivePlayer(room, room.knightAction);
+        const target = getAlivePlayer(room, targetName);
+        const protectedPlayer = getAlivePlayer(room, room.knightAction);
 
-    if (target) {
-        if (protectedPlayer && target.name === protectedPlayer.name) {
-            protectedPlayerName = target.name;
-        } else {
-            target.alive = false;
-            eliminatedPlayer = target.name;
+        if (target) {
+            if (protectedPlayer && target.name === protectedPlayer.name) {
+                protectedPlayerName = target.name;
+            } else {
+                target.alive = false;
+                eliminatedPlayer = target.name;
+            }
         }
-    }
 
-    room.werewolfVotes = {};
-    room.knightAction = null;
-    room.seerAction = null;
+        room.werewolfVotes = {};
+        room.knightAction = null;
+        room.seerAction = null;
 
-    io.to(roomCode).emit("nightEnded", {
-        eliminatedPlayer,
-        protectedPlayer: protectedPlayerName,
-        players: getPublicPlayers(room),
-    });
-    // allow checkGameOver/startDay to proceed, but ensure the processing flag
-    // is cleared so future nights can be resolved normally.
-    if (checkGameOver(roomCode, { reason: "nightResolution", triggeredBy: "resolveNightActions" })) {
+        io.to(roomCode).emit("nightEnded", {
+            eliminatedPlayer,
+            protectedPlayer: protectedPlayerName,
+            players: getPublicPlayers(room),
+        });
+
+        if (checkGameOver(roomCode, { reason: "nightResolution", triggeredBy: "resolveNightActions" })) {
+            return;
+        }
+
+        startDay(roomCode);
+    } finally {
         room.processingNight = false;
-        return;
     }
-
-    startDay(roomCode);
-    room.processingNight = false;
 }
 
 function startDay(roomCode) {
@@ -648,6 +718,7 @@ function startVoting(roomCode) {
     room.phase = PHASES.VOTING;
     room.publicVotes = {};
     room.phaseEndTime = Date.now() + VOTING_DURATION;
+    room.processingVoting = false;
 
     emitPhase(roomCode, room);
 
@@ -661,6 +732,12 @@ function endVoting(roomCode) {
 
     if (!room) return;
 
+    // Timer safety: If we're no longer in VOTING, bail out
+    if (room.phase !== PHASES.VOTING) {
+        console.log(`[GAME] endVoting skipped (phase=${room.phase}, expected=voting) room=${roomCode}`);
+        return;
+    }
+
     if (room.processingVoting) {
         console.log(`[GAME] endVoting skipped (already processing) room=${roomCode}`);
         return;
@@ -668,51 +745,59 @@ function endVoting(roomCode) {
 
     room.processingVoting = true;
 
-    clearRoomTimer(room);
+    // FIX B7: Use try/finally so the processing flag is always cleared
+    try {
+        clearRoomTimer(room);
 
-    const counts = {};
+        const counts = {};
 
-    Object.values(room.publicVotes).forEach((target) => {
-        counts[target] = (counts[target] || 0) + 1;
-    });
+        Object.values(room.publicVotes).forEach((target) => {
+            counts[target] = (counts[target] || 0) + 1;
+        });
 
-    let eliminatedPlayer = null;
-    let highestVotes = 0;
-    let tie = false;
+        let eliminatedPlayer = null;
+        let highestVotes = 0;
+        let tie = false;
 
-    for (const player in counts) {
-        if (counts[player] > highestVotes) {
-            highestVotes = counts[player];
-            eliminatedPlayer = player;
-            tie = false;
-        } else if (counts[player] === highestVotes) {
-            tie = true;
+        for (const player in counts) {
+            if (counts[player] > highestVotes) {
+                highestVotes = counts[player];
+                eliminatedPlayer = player;
+                tie = false;
+            } else if (counts[player] === highestVotes) {
+                tie = true;
+            }
         }
-    }
 
-    if (eliminatedPlayer && !tie) {
-        const target = getAlivePlayer(room, eliminatedPlayer);
-        if (target) {
-            target.alive = false;
+        if (eliminatedPlayer && !tie) {
+            const target = getAlivePlayer(room, eliminatedPlayer);
+            if (target) {
+                target.alive = false;
+            }
+        } else {
+            eliminatedPlayer = null;
         }
-    } else {
-        eliminatedPlayer = null;
-    }
 
-    room.publicVotes = {};
+        room.publicVotes = {};
 
-    io.to(roomCode).emit("votingEnded", {
-        eliminatedPlayer,
-        players: getPublicPlayers(room),
-    });
-    if (checkGameOver(roomCode, { reason: "votingResolution", triggeredBy: "endVoting" })) {
+        io.to(roomCode).emit("votingEnded", {
+            eliminatedPlayer,
+            players: getPublicPlayers(room),
+        });
+
+        if (checkGameOver(roomCode, { reason: "votingResolution", triggeredBy: "endVoting" })) {
+            return;
+        }
+
+        startNight(roomCode);
+    } finally {
         room.processingVoting = false;
-        return;
     }
-
-    startNight(roomCode);
-    room.processingVoting = false;
 }
+
+// ---------------------------------------------------------------------------
+// Win condition
+// ---------------------------------------------------------------------------
 
 function checkGameOver(roomCode, { reason = "unknown", triggeredBy = "unknown" } = {}) {
     const room = getRoom(roomCode);
@@ -736,7 +821,7 @@ function checkGameOver(roomCode, { reason = "unknown", triggeredBy = "unknown" }
     }
 
     console.log(
-        `[GAME_END] room=${roomCode} reason=${reason} triggeredBy=${triggeredBy} alivePlayers=${alivePlayers.length} aliveWerewolves=${aliveWerewolves} aliveVillagers=${aliveVillagers} winner=${winner}`,
+        `[GAME] ENDED room=${roomCode} reason=${reason} triggeredBy=${triggeredBy} alivePlayers=${alivePlayers.length} aliveWerewolves=${aliveWerewolves} aliveVillagers=${aliveVillagers} winner=${winner}`,
     );
 
     clearRoomTimer(room);
@@ -744,13 +829,25 @@ function checkGameOver(roomCode, { reason = "unknown", triggeredBy = "unknown" }
     room.phase = PHASES.ENDED;
     room.phaseEndTime = null;
 
+    // Security: Send player data without socketIds
+    const safePlayers = room.players.map((player) => ({
+        name: player.name,
+        role: player.role,
+        alive: player.alive,
+        connected: player.connected,
+    }));
+
     io.to(roomCode).emit("gameEnded", {
         winner,
-        players: room.players,
+        players: safePlayers,
     });
 
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// Player actions: Public vote
+// ---------------------------------------------------------------------------
 
 export function publicVote(roomCode, socketId, targetName) {
     const room = getRoom(roomCode);
@@ -793,6 +890,10 @@ export function publicVote(roomCode, socketId, targetName) {
         message: "Vote recorded.",
     };
 }
+
+// ---------------------------------------------------------------------------
+// Player actions: Werewolf vote
+// ---------------------------------------------------------------------------
 
 export function werewolfVote(roomCode, socketId, targetName) {
     const room = getRoom(roomCode);
@@ -843,6 +944,10 @@ export function werewolfVote(roomCode, socketId, targetName) {
     };
 }
 
+// ---------------------------------------------------------------------------
+// Player actions: Knight protect
+// ---------------------------------------------------------------------------
+
 export function knightProtect(roomCode, socketId, targetName) {
     const room = getRoom(roomCode);
 
@@ -888,6 +993,10 @@ export function knightProtect(roomCode, socketId, targetName) {
     };
 }
 
+// ---------------------------------------------------------------------------
+// Player actions: Seer peek
+// ---------------------------------------------------------------------------
+
 export function seerPeek(roomCode, socketId, targetName) {
     const room = getRoom(roomCode);
 
@@ -918,7 +1027,8 @@ export function seerPeek(roomCode, socketId, targetName) {
     validation = validateRole(seer, "Seer");
     if (!validation.success) return validation;
 
-    if (room.seerAction?.seer === socketId) {
+    // FIX B4: Use player.name (stable) instead of socketId to check duplicate seer actions
+    if (room.seerAction?.seer === seer.name) {
         return {
             success: false,
             message: "You have already used your ability tonight.",
@@ -930,8 +1040,9 @@ export function seerPeek(roomCode, socketId, targetName) {
 
     const target = getPlayer(room, targetName);
 
+    // FIX B4: Store player.name instead of socketId
     room.seerAction = {
-        seer: socketId,
+        seer: seer.name,
         target: target.name,
     };
 
@@ -945,6 +1056,10 @@ export function seerPeek(roomCode, socketId, targetName) {
         role: target.role,
     };
 }
+
+// ---------------------------------------------------------------------------
+// Disconnect / reconnect / leave
+// ---------------------------------------------------------------------------
 
 export function playerDisconnected(roomCode, socketId, playerId = null) {
     const room = getRoom(roomCode);
@@ -963,7 +1078,10 @@ export function playerDisconnected(roomCode, socketId, playerId = null) {
 
     if (!player) return;
 
-    if (player.socketId !== socketId && playerId) {
+    // If the player has already reconnected with a different socket, ignore
+    // this stale disconnect event.
+    if (player.socketId && player.socketId !== socketId) {
+        console.log(`[PLAYER] DISCONNECT_IGNORED (stale socket) room=${roomCode} player=${player.name} currentSocket=${player.socketId} staleSocket=${socketId}`);
         return;
     }
 
@@ -972,15 +1090,31 @@ export function playerDisconnected(roomCode, socketId, playerId = null) {
     player.afk = true;
     player.connected = false;
 
-    console.log(`[PLAYER] DISCONNECTED_GRACE room=${roomCode} player=${player.name} playerId=${player.playerId} socketId=${socketId}`);
+    console.log(`[PLAYER] DISCONNECTED room=${roomCode} player=${player.name} playerId=${player.playerId} socketId=${socketId}`);
 
     io.to(roomCode).emit("playerDisconnected", {
         player: player.name,
         players: getPublicPlayers(room),
     });
 
+    // Transfer host if the disconnected player was host
     if (room.host === player.name) {
         transferHost(roomCode, room);
+    }
+
+    // If a night-role player disconnects, check if all remaining connected
+    // night-role players have acted so we can advance the phase
+    if (room.started && room.phase === PHASES.NIGHT && !room.processingNight) {
+        if (haveAllLivingNightRolesActed(room)) {
+            resolveNightActions(roomCode);
+        }
+    }
+
+    // Same for voting phase
+    if (room.started && room.phase === PHASES.VOTING && !room.processingVoting) {
+        if (haveAllLivingPlayersVoted(room)) {
+            endVoting(roomCode);
+        }
     }
 }
 
@@ -995,29 +1129,45 @@ export function removeDisconnectedPlayer(roomCode, socketId, playerId = null) {
         player = getPlayerByPlayerId(room, playerId);
     }
 
-    if (!player) {
+    if (!player && socketId) {
         player = getPlayerBySocket(room, socketId);
     }
 
     if (!player) return;
 
-    if (player.socketId !== socketId && playerId) {
-        return;
-    }
-
+    // FIX B2: If the player has reconnected (connected is true), don't remove them.
+    // This now works correctly because B1 ensures disconnected players have connected=false.
     if (player.connected) {
+        console.log(`[PLAYER] REMOVE_SKIPPED (reconnected) room=${roomCode} player=${player.name}`);
         return;
     }
 
     const removedPlayerName = player.name;
     const wasHost = room.host === player.name;
 
+    // During an active game, mark the player dead instead of removing them
+    // to keep the game state consistent.
+    if (room.started && room.phase !== PHASES.ENDED) {
+        player.alive = false;
+        console.log(`[PLAYER] ELIMINATED_BY_TIMEOUT room=${roomCode} player=${removedPlayerName}`);
+
+        io.to(roomCode).emit("playerLeft", getPublicPlayers(room));
+
+        if (wasHost) {
+            transferHost(roomCode, room);
+        }
+
+        checkGameOver(roomCode, { reason: "disconnectTimeout", triggeredBy: removedPlayerName });
+        return;
+    }
+
+    // In lobby or ended phase, remove the player entirely
     room.players = room.players.filter((currentPlayer) => currentPlayer !== player);
 
     if (room.players.length === 0) {
         clearRoomTimer(room);
         delete rooms[roomCode];
-        console.log(`[DISCONNECT_REMOVED] room=${roomCode} player=${removedPlayerName} roomDeleted=true`);
+        console.log(`[ROOM] DELETED room=${roomCode} reason=empty lastPlayer=${removedPlayerName}`);
         return;
     }
 
@@ -1029,10 +1179,8 @@ export function removeDisconnectedPlayer(roomCode, socketId, playerId = null) {
 
     const { activePlayers, disconnectedPlayers, totalPlayers } = getRoomOccupancy(room);
     console.log(
-        `[DISCONNECT_REMOVED] room=${roomCode} player=${removedPlayerName} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers}`,
+        `[PLAYER] REMOVED room=${roomCode} player=${removedPlayerName} activePlayers=${activePlayers} disconnectedPlayers=${disconnectedPlayers} totalPlayers=${totalPlayers}`,
     );
-
-    checkGameOver(roomCode, { reason: "disconnectTimeout", triggeredBy: removedPlayerName });
 }
 
 function transferHost(roomCode, room) {
@@ -1056,7 +1204,7 @@ export function reconnectPlayer(roomCode, playerName, socketId, playerId = null)
     const room = getRoom(roomCode);
 
     if (!room) {
-        return { success: false, playerId: null };
+        return { success: false, playerId: null, players: [] };
     }
 
     let player = null;
@@ -1070,23 +1218,41 @@ export function reconnectPlayer(roomCode, playerName, socketId, playerId = null)
     }
 
     if (!player) {
-        return { success: false, playerId: null };
+        return { success: false, playerId: null, players: [] };
     }
 
     if (!player.playerId) {
         player.playerId = randomUUID();
     }
 
+    // If the player already has a different active socket, disconnect the old one
+    if (player.socketId && player.socketId !== socketId) {
+        const oldSocket = io.sockets.sockets.get(player.socketId);
+        if (oldSocket) {
+            // Clear socket data so the old socket's disconnect handler won't
+            // re-trigger playerDisconnected for this player
+            oldSocket.data.roomCode = null;
+            oldSocket.data.playerId = null;
+            oldSocket.data.playerName = null;
+            oldSocket.leave(roomCode);
+            oldSocket.disconnect(true);
+        }
+    }
+
     player.socketId = socketId;
     player.afk = false;
     player.connected = true;
 
-    console.log(`[PLAYER] RECONNECTED room=${roomCode} player=${player.name} playerId=${player.playerId} oldSocketId=${player.lastSocketId || "unknown"} socketId=${socketId}`);
+    console.log(`[PLAYER] RECONNECTED room=${roomCode} player=${player.name} playerId=${player.playerId} socketId=${socketId}`);
 
     player.lastSocketId = null;
 
-    return { success: true, playerId: player.playerId };
+    return { success: true, playerId: player.playerId, players: getPublicPlayers(room) };
 }
+
+// ---------------------------------------------------------------------------
+// Reset game (full reset to lobby state)
+// ---------------------------------------------------------------------------
 
 export function resetGame(roomCode) {
     const room = getRoom(roomCode);
@@ -1103,11 +1269,9 @@ export function resetGame(roomCode) {
     room.werewolfVotes = {};
     room.publicMessages = [];
     room.werewolfMessages = [];
-    room.werewolfTarget = {};
+    room.werewolfTarget = null;
     room.knightAction = null;
     room.seerAction = null;
-    room.werewolfVotes = {};
-    room.actionTracker = { night: {}, voting: {} };
     room.processingNight = false;
     room.processingVoting = false;
 
@@ -1121,6 +1285,12 @@ export function resetGame(roomCode) {
     io.to(roomCode).emit("gameReset");
 }
 
+// ---------------------------------------------------------------------------
+// Intentional leave
+// ---------------------------------------------------------------------------
+
+// FIX B5: During active games, mark the player as dead/disconnected instead
+// of removing them, and trigger a game-over check.
 export function leaveRoom(roomCode, playerName, socketId = null, playerId = null) {
     const room = getRoom(roomCode);
 
@@ -1138,20 +1308,55 @@ export function leaveRoom(roomCode, playerName, socketId = null, playerId = null
 
     if (!player) return;
 
+    // Ensure the requesting socket owns this player
     if (socketId && player.socketId && player.socketId !== socketId) {
         return;
     }
 
+    const wasHost = room.host === player.name;
+
+    if (room.started && room.phase !== PHASES.ENDED) {
+        // During an active game, mark the player dead/disconnected rather
+        // than removing them from the players array.
+        player.alive = false;
+        player.connected = false;
+        player.afk = true;
+        player.socketId = null;
+
+        console.log(`[PLAYER] LEFT_DURING_GAME room=${roomCode} player=${player.name}`);
+
+        if (wasHost) {
+            transferHost(roomCode, room);
+        }
+
+        io.to(roomCode).emit("playerLeft", getPublicPlayers(room));
+
+        // Leaving during night/voting may advance the phase if all remaining
+        // connected players have acted.
+        if (room.phase === PHASES.NIGHT && !room.processingNight && haveAllLivingNightRolesActed(room)) {
+            resolveNightActions(roomCode);
+        }
+        if (room.phase === PHASES.VOTING && !room.processingVoting && haveAllLivingPlayersVoted(room)) {
+            endVoting(roomCode);
+        }
+
+        checkGameOver(roomCode, { reason: "playerLeft", triggeredBy: player.name });
+        return;
+    }
+
+    // In lobby or ended phase: remove the player entirely.
     room.players = room.players.filter((currentPlayer) => currentPlayer !== player);
 
     if (room.players.length === 0) {
         clearRoomTimer(room);
         delete rooms[roomCode];
+        console.log(`[ROOM] DELETED room=${roomCode} reason=empty lastPlayer=${playerName}`);
         return;
     }
 
-    if (room.host === player.name) {
+    if (wasHost) {
         room.host = room.players[0].name;
+        io.to(roomCode).emit("hostChanged", { host: room.host });
     }
 
     io.to(roomCode).emit("playerLeft", getPublicPlayers(room));

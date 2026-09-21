@@ -37,6 +37,22 @@ if (fs.existsSync(publicDir)) {
     });
 }
 
+// ---------------------------------------------------------------------------
+// Process-level crash prevention (Component 5)
+// ---------------------------------------------------------------------------
+
+process.on("uncaughtException", (err) => {
+    console.error("[FATAL] Uncaught exception:", err);
+    // In production you may want to do a graceful shutdown here.
+    // For now, log and let the process manager (e.g. Render) restart.
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+    console.error("[FATAL] Unhandled promise rejection:", reason);
+});
+
+// ---------------------------------------------------------------------------
+
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
