@@ -5,6 +5,21 @@ import { useGameStore } from "../store/gameStore";
 import { useGameSounds } from "./useGameSounds";
 
 /**
+ * Helper: inject a system-style message into the public chat.
+ * System messages have `sender: null` and `system: true` so
+ * the ChatPanel can render them as centered dividers.
+ */
+function injectSystemMessage(store, text, icon = "✦") {
+  store.getState().addMessage({
+    sender: null,
+    message: text,
+    system: true,
+    icon,
+    timestamp: Date.now(),
+  });
+}
+
+/**
  * FIX B10: The previous version included many store action references and
  * `ownRole` in the useEffect dependency array. This caused the entire
  * listener setup to be torn down and rebuilt every time the role changed
@@ -70,8 +85,6 @@ export function useGameSocket() {
       },
 
       // ---- Player list updates ----
-      // The server now pushes the full players array in playerConnected,
-      // so we no longer need an HTTP round-trip.
       playerJoined: (players) => store.getState().setPlayers(players),
       playerLeft: (players) => store.getState().setPlayers(players),
       playerConnected: ({ players }) => {
@@ -84,7 +97,17 @@ export function useGameSocket() {
       hostChanged: ({ host }) => store.getState().setHost(host),
 
       // ---- Phase changes ----
-      phaseChanged: (data) => store.getState().setPhase(data),
+      phaseChanged: (data) => {
+        store.getState().setPhase(data);
+        // Inject phase change as system message in chat
+        const labels = {
+          night: ["☾", "Night has fallen."],
+          day: ["☼", "A new day begins."],
+          voting: ["⚖", "The vote has begun."],
+        };
+        const label = labels[data.phase];
+        if (label) injectSystemMessage(store, label[1], label[0]);
+      },
 
       // ---- Role assignment ----
       roleAssigned: (data) => store.getState().setRole(data),
@@ -111,8 +134,29 @@ export function useGameSocket() {
       // ---- Night resolution ----
       nightEnded: ({ eliminatedPlayer, protectedPlayer, players }) => {
         store.getState().setPlayers(players);
-        if (eliminatedPlayer) play("killed");
-        else if (protectedPlayer) play("protected");
+        if (eliminatedPlayer) {
+          play("killed");
+          // Center-screen dramatic event
+          store.getState().setGameEvent({
+            icon: "☠",
+            title: `${eliminatedPlayer} has fallen`,
+            subtitle: "They did not survive the night.",
+            accent: "text-rose-100",
+          });
+          injectSystemMessage(store, `${eliminatedPlayer} did not survive the night.`, "☠");
+        } else if (protectedPlayer) {
+          play("protected");
+          store.getState().setGameEvent({
+            icon: "🛡️",
+            title: "The Knight prevails",
+            subtitle: `${protectedPlayer} was protected from the wolves.`,
+            accent: "text-sky-100",
+          });
+          injectSystemMessage(store, `The Knight protected ${protectedPlayer}.`, "🛡️");
+        } else {
+          injectSystemMessage(store, "The night passed without a victim.", "☾");
+        }
+        // Keep the toast as secondary notification
         const message = eliminatedPlayer
           ? `${eliminatedPlayer} did not survive the night.`
           : protectedPlayer
@@ -124,7 +168,18 @@ export function useGameSocket() {
       // ---- Voting resolution ----
       votingEnded: ({ eliminatedPlayer, players }) => {
         store.getState().setPlayers(players);
-        if (eliminatedPlayer) play("voteKick");
+        if (eliminatedPlayer) {
+          play("voteKick");
+          store.getState().setGameEvent({
+            icon: "⚖",
+            title: `${eliminatedPlayer} was cast out`,
+            subtitle: "The village has spoken.",
+            accent: "text-amber-100",
+          });
+          injectSystemMessage(store, `${eliminatedPlayer} was cast out by the village.`, "⚖");
+        } else {
+          injectSystemMessage(store, "The vote ended in a tie. No one was eliminated.", "⚖");
+        }
         toast(
           eliminatedPlayer
             ? `${eliminatedPlayer} was cast out.`

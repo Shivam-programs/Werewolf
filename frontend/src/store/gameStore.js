@@ -25,6 +25,10 @@ export const useGameStore = create((set) => ({
   actionSubmitted: false,
   gameResult: null,
 
+  // Center-screen major game event (eliminations, protections)
+  gameEvent: null,
+  setGameEvent: (gameEvent) => set({ gameEvent }),
+
   // Connection status: "connected" | "disconnected" | "reconnecting"
   connectionStatus: "disconnected",
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
@@ -69,6 +73,7 @@ export const useGameStore = create((set) => ({
     voteSubmitted: false,
     actionSubmitted: false,
     gameResult: null,
+    gameEvent: null,
   }),
   enterReplayQueue: () => set({
     phase: "waiting",
@@ -82,6 +87,7 @@ export const useGameStore = create((set) => ({
     voteSubmitted: false,
     actionSubmitted: false,
     gameResult: null,
+    gameEvent: null,
   }),
   leave: () => {
     sessionStorage.removeItem("howl-hollow-session");

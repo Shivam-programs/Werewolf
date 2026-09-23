@@ -13,7 +13,10 @@ function Room() {
   useGameSocket();
   if (!roomCode) return <Navigate to="/" replace />;
   const exit = () => {
-    socket.emit("leaveRoom", { roomCode, playerName: useGameStore.getState().playerName });
+    socket.emit("leaveRoom", {
+      roomCode,
+      playerName: useGameStore.getState().playerName,
+    });
     socket.disconnect();
     leave();
     navigate("/");
@@ -32,8 +35,19 @@ export default function App() {
       <Toaster
         position="top-right"
         toastOptions={{
-          className: "!bg-zinc-900 !text-zinc-100 !border !border-white/10",
+          className:
+            "!bg-zinc-900/95 !text-zinc-100 !border !border-white/10 !backdrop-blur-sm !shadow-xl !rounded-xl !text-sm",
           duration: 3500,
+          success: {
+            className:
+              "!bg-emerald-950/90 !text-emerald-100 !border !border-emerald-500/15 !backdrop-blur-sm !shadow-xl !rounded-xl !text-sm",
+            iconTheme: { primary: "#34d399", secondary: "#064e3b" },
+          },
+          error: {
+            className:
+              "!bg-rose-950/90 !text-rose-100 !border !border-rose-500/15 !backdrop-blur-sm !shadow-xl !rounded-xl !text-sm",
+            iconTheme: { primary: "#f87171", secondary: "#4c0519" },
+          },
         }}
       />
     </>
