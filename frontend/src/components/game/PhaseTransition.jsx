@@ -25,14 +25,17 @@ const phases = {
   },
 };
 
-export function PhaseTransition({ phase }) {
+export function PhaseTransition({ phase, suspended = false }) {
   const [dismissedPhase, setDismissedPhase] = useState(null);
 
   useEffect(() => {
     if (!phases[phase]) return undefined;
+    // Wait for a major game event to clear before announcing the new phase so
+    // the two centre-screen overlays are shown one after another, never at once.
+    if (suspended) return undefined;
     const timer = window.setTimeout(() => setDismissedPhase(phase), 1800);
     return () => window.clearTimeout(timer);
-  }, [phase]);
+  }, [phase, suspended]);
 
   const info = phases[phase];
   if (!info) return null;

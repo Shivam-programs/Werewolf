@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import toast from "react-hot-toast";
 import { ensureSocket, socket, subscribeSocket } from "../services/socket";
 import { useGameStore } from "../store/gameStore";
+import { buildGameEvent } from "../lib/gameEvents";
 import { useGameSounds } from "./useGameSounds";
 
 /**
@@ -40,6 +41,12 @@ export function useGameSocket() {
     if (!roomCode || !playerName) return undefined;
 
     const store = useGameStore;
+
+    // A late event from a previous game must never mutate the current one.
+    const isStaleRound = (roundId) => {
+      const current = store.getState().roundId;
+      return typeof roundId === "number" && current > 0 && roundId !== current;
+    };
 
     const register = () => {
       socket.emit("registerPlayer", {
@@ -86,15 +93,40 @@ export function useGameSocket() {
 
       // ---- Player list updates ----
       playerJoined: (players) => store.getState().setPlayers(players),
-      playerLeft: (players) => store.getState().setPlayers(players),
-      playerConnected: ({ players }) => {
+      playerLeft: ({ player, players } = {}) => {
         if (players) store.getState().setPlayers(players);
+        const { phase } = store.getState();
+        if (player && ["night", "day", "voting"].includes(phase)) {
+          // Leaving mid-game effectively removes a player from the hunt.
+          store.getState().pushEvent(
+            buildGameEvent("removed", {
+              player,
+              message: "left the game and can no longer take part.",
+            }),
+          );
+          store.getState().setHighlightedPlayer(player);
+        } else if (player) {
+          toast(`${player} left the room.`, { icon: "👋" });
+        }
       },
-      playerDisconnected: ({ players }) => {
+      playerConnected: ({ player, players }) => {
         if (players) store.getState().setPlayers(players);
+        if (player) toast(`${player} reconnected.`, { icon: "✓" });
       },
-      queueUpdated: (players) => store.getState().setPlayers(players),
+      playerDisconnected: ({ player, players }) => {
+        if (players) store.getState().setPlayers(players);
+        if (player) toast(`${player} lost connection.`, { icon: "⚡" });
+      },
+      queueUpdated: (players) => store.getState().setReplayPlayers(players),
       hostChanged: ({ host }) => store.getState().setHost(host),
+
+      // ---- Server-driven major game events (personal + broadcast) ----
+      gameEvent: (data) => {
+        const event = buildGameEvent(data?.kind, data || {});
+        if (!event) return;
+        store.getState().pushEvent(event);
+        if (event.sound) play(event.sound);
+      },
 
       // ---- Phase changes ----
       phaseChanged: (data) => {
@@ -121,75 +153,66 @@ export function useGameSocket() {
       werewolfMessageResult: (result) =>
         result.success || toast.error(result.message || "Message failed."),
 
-      // ---- Seer action events ----
+      // ---- Seer action events (private to the seer) ----
       actionError: (result) => toast.error(result.message),
       seerResult: (result) => {
         if (!result.success) return toast.error(result.message);
         store.getState().revealPlayerRole(result);
         store.getState().markActionSubmitted();
         play(result.role === "Werewolf" ? "seerWolf" : "seerVillager");
-        return toast.success(`${result.player} is ${result.role}.`);
+        store.getState().pushEvent(
+          buildGameEvent("seerResult", {
+            player: result.player,
+            message: `You see ${result.player} as ${result.role}.`,
+          }),
+        );
+        return undefined;
       },
 
       // ---- Night resolution ----
-      nightEnded: ({ eliminatedPlayer, protectedPlayer, players }) => {
+      nightEnded: ({ roundId, eliminatedPlayer, players }) => {
+        if (isStaleRound(roundId)) return;
         store.getState().setPlayers(players);
         if (eliminatedPlayer) {
           play("killed");
-          // Center-screen dramatic event
-          store.getState().setGameEvent({
-            icon: "☠",
-            title: `${eliminatedPlayer} has fallen`,
-            subtitle: "They did not survive the night.",
-            accent: "text-rose-100",
-          });
+          store.getState().pushEvent(
+            buildGameEvent("eliminated", {
+              player: eliminatedPlayer,
+              message: "did not survive the night.",
+            }),
+          );
+          store.getState().setHighlightedPlayer(eliminatedPlayer);
           injectSystemMessage(store, `${eliminatedPlayer} did not survive the night.`, "☠");
-        } else if (protectedPlayer) {
-          play("protected");
-          store.getState().setGameEvent({
-            icon: "🛡️",
-            title: "The Knight prevails",
-            subtitle: `${protectedPlayer} was protected from the wolves.`,
-            accent: "text-sky-100",
-          });
-          injectSystemMessage(store, `The Knight protected ${protectedPlayer}.`, "🛡️");
         } else {
           injectSystemMessage(store, "The night passed without a victim.", "☾");
         }
-        // Keep the toast as secondary notification
-        const message = eliminatedPlayer
-          ? `${eliminatedPlayer} did not survive the night.`
-          : protectedPlayer
-            ? `The Knight protected ${protectedPlayer}.`
-            : "The night passed without a victim.";
-        toast(message, { icon: "☾" });
       },
 
       // ---- Voting resolution ----
-      votingEnded: ({ eliminatedPlayer, players }) => {
+      votingEnded: ({ roundId, eliminatedPlayer, players }) => {
+        if (isStaleRound(roundId)) return;
         store.getState().setPlayers(players);
         if (eliminatedPlayer) {
           play("voteKick");
-          store.getState().setGameEvent({
-            icon: "⚖",
-            title: `${eliminatedPlayer} was cast out`,
-            subtitle: "The village has spoken.",
-            accent: "text-amber-100",
-          });
+          store.getState().pushEvent(
+            buildGameEvent("votedOut", {
+              player: eliminatedPlayer,
+              message: "was cast out by the village.",
+            }),
+          );
+          store.getState().setHighlightedPlayer(eliminatedPlayer);
           injectSystemMessage(store, `${eliminatedPlayer} was cast out by the village.`, "⚖");
         } else {
           injectSystemMessage(store, "The vote ended in a tie. No one was eliminated.", "⚖");
         }
-        toast(
-          eliminatedPlayer
-            ? `${eliminatedPlayer} was cast out.`
-            : "The vote ended in a tie.",
-          { icon: "⚖" },
-        );
       },
 
       // ---- Game over ----
       gameEnded: (result) => {
+        // Ignore an ending that belongs to an already-finished round.
+        if (isStaleRound(result?.roundId)) return;
+        // setGameResult clears any pending event so the result screen is the
+        // single, authoritative presentation of the ending.
         store.getState().setGameResult(result);
         const { ownRole } = store.getState();
         const won =

@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect } from "react";
 import { useGameStore } from "../../store/gameStore";
 
 const avatarColors = [
@@ -40,13 +41,25 @@ export function PlayerList({ waiting = false }) {
     ownRole,
     werewolfTeammates,
     revealedRoles,
+    highlightedPlayer,
+    setHighlightedPlayer,
   } = useGameStore();
 
   const isInGame = phase !== "waiting" && phase !== "ended";
+  // Roles are only ever public during an active game (fallen players) or on the
+  // results screen — never while the village is gathering for a new round.
+  const showRoles = phase !== "waiting";
   const visiblePlayers = isInGame
     ? players
     : players.filter((p) => p.connected !== false && !p.afk);
   const alivePlayers = visiblePlayers.filter((p) => p.alive !== false);
+
+  // Fade the elimination emphasis shortly after the event has played.
+  useEffect(() => {
+    if (!highlightedPlayer) return undefined;
+    const timer = window.setTimeout(() => setHighlightedPlayer(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [highlightedPlayer, setHighlightedPlayer]);
 
   return (
     <section className="panel flex min-h-0 flex-col p-4 sm:p-5">
@@ -75,15 +88,17 @@ export function PlayerList({ waiting = false }) {
               ownRole === "Werewolf" && werewolfTeammates.includes(player.name)
                 ? "Werewolf"
                 : null;
-            const visibleRole =
-              player.alive === false
+            const visibleRole = showRoles
+              ? player.alive === false
                 ? player.role
-                : revealedRole || teammateRole;
+                : revealedRole || teammateRole
+              : null;
 
             const isDisconnected = player.afk || player.connected === false;
             const isDead = player.alive === false;
             const isYou = player.name === playerName;
             const isHost = player.name === host;
+            const isHighlighted = player.name === highlightedPlayer;
             const initial = player.name.charAt(0).toUpperCase();
             const color = avatarColors[index % avatarColors.length];
 
@@ -91,7 +106,7 @@ export function PlayerList({ waiting = false }) {
               <motion.div
                 layout
                 initial={{ opacity: 0, x: -12 }}
-                animate={{ opacity: 1, x: 0 }}
+                animate={{ opacity: 1, x: 0, scale: isHighlighted ? [1, 1.045, 1] : 1 }}
                 exit={{ opacity: 0, x: 12 }}
                 transition={{ delay: index * 0.03, type: "spring", stiffness: 300, damping: 25 }}
                 key={player.name}
@@ -101,7 +116,9 @@ export function PlayerList({ waiting = false }) {
                     : isDisconnected
                       ? "border-yellow-500/10 bg-yellow-950/5 opacity-60"
                       : "border-white/7 bg-white/[.025] hover:bg-white/[.04]"
-                } ${isYou ? "border-l-2 border-l-amber-400/60" : ""}`}
+                } ${isYou ? "border-l-2 border-l-amber-400/60" : ""} ${
+                  isHighlighted ? "ring-2 ring-rose-400/70" : ""
+                }`}
               >
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">

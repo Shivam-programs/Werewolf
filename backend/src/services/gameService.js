@@ -94,6 +94,7 @@ export function getRoomState(roomCode, socketId) {
         room: {
             host: room.host,
             started: room.started,
+            roundId: room.roundId,
             phase: room.replayQueue && player.ready ? PHASES.WAITING : room.phase,
             day: room.replayQueue && player.ready ? 0 : room.day,
             endsAt: room.replayQueue && player.ready ? null : room.phaseEndTime,
@@ -129,10 +130,15 @@ function clearRoomTimer(room) {
 }
 
 function emitPhase(roomCode, room) {
+    // Include the authoritative public player list with every phase change so
+    // a new round can never inherit a stale `players` array (with the previous
+    // game's roles/eliminations) on the client.
     io.to(roomCode).emit("phaseChanged", {
         phase: room.phase,
         day: room.day,
         endsAt: room.phaseEndTime,
+        roundId: room.roundId,
+        players: getPublicPlayers(room),
     });
 }
 
@@ -287,6 +293,7 @@ function createRoom(playerName) {
         host: playerName,
         started: false,
         replayQueue: false,
+        roundId: 0,
         phase: PHASES.WAITING,
         phaseEndTime: null,
         timer: null,
@@ -540,6 +547,10 @@ export function startGame(roomCode, socketId) {
 function prepareNewRound(room) {
     clearRoomTimer(room);
 
+    // New round identifier — lets the client discard any state belonging to
+    // the previous game the moment a fresh game begins.
+    room.roundId = (room.roundId || 0) + 1;
+
     room.day = 0;
     room.phase = PHASES.WAITING;
     room.phaseEndTime = null;
@@ -568,7 +579,9 @@ function prepareNewRound(room) {
 export function queueForNextRound(roomCode, socketId) {
     const room = getRoom(roomCode);
 
-    if (!room || room.phase !== PHASES.ENDED) {
+    // Accept while the game is over, and while we are already collecting the
+    // replay queue (phase is reset to waiting for the first joiner).
+    if (!room || (room.phase !== PHASES.ENDED && !room.replayQueue)) {
         return { success: false, message: "The previous game has not ended." };
     }
 
@@ -580,10 +593,24 @@ export function queueForNextRound(roomCode, socketId) {
     if (!room.replayQueue) {
         clearRoomTimer(room);
         room.replayQueue = true;
+        room.phase = PHASES.WAITING;
+        room.phaseEndTime = null;
+        room.day = 0;
         room.publicMessages = [];
         room.werewolfMessages = [];
+        room.publicVotes = {};
+        room.werewolfVotes = {};
+        room.werewolfTarget = null;
+        room.knightAction = null;
+        room.seerAction = null;
+        room.processingNight = false;
+        room.processingVoting = false;
         room.players.forEach((roomPlayer) => {
             roomPlayer.ready = false;
+            // Clear the finished game's reveal state immediately so roles are
+            // hidden as soon as players queue for the next round.
+            roomPlayer.role = null;
+            roomPlayer.alive = true;
         });
     }
 
@@ -661,6 +688,11 @@ function resolveNightActions(roomCode) {
 
         const target = getAlivePlayer(room, targetName);
         const protectedPlayer = getAlivePlayer(room, room.knightAction);
+        // Capture the Knight before the action is cleared so the protection
+        // outcome can be delivered privately to them only.
+        const knightPlayer = room.players.find(
+            (player) => player.role === "Knight" && player.socketId
+        );
 
         if (target) {
             if (protectedPlayer && target.name === protectedPlayer.name) {
@@ -676,10 +708,20 @@ function resolveNightActions(roomCode) {
         room.seerAction = null;
 
         io.to(roomCode).emit("nightEnded", {
+            roundId: room.roundId,
             eliminatedPlayer,
-            protectedPlayer: protectedPlayerName,
             players: getPublicPlayers(room),
         });
+
+        // Protection detail is private knowledge: only the Knight learns that
+        // their shield held (never broadcast to the rest of the village).
+        if (protectedPlayerName && knightPlayer?.socketId) {
+            io.to(knightPlayer.socketId).emit("gameEvent", {
+                kind: "protected",
+                player: protectedPlayerName,
+                message: "Your shield held through the night.",
+            });
+        }
 
         if (checkGameOver(roomCode, { reason: "nightResolution", triggeredBy: "resolveNightActions" })) {
             return;
@@ -781,6 +823,7 @@ function endVoting(roomCode) {
         room.publicVotes = {};
 
         io.to(roomCode).emit("votingEnded", {
+            roundId: room.roundId,
             eliminatedPlayer,
             players: getPublicPlayers(room),
         });
@@ -838,6 +881,7 @@ function checkGameOver(roomCode, { reason = "unknown", triggeredBy = "unknown" }
     }));
 
     io.to(roomCode).emit("gameEnded", {
+        roundId: room.roundId,
         winner,
         players: safePlayers,
     });
@@ -934,6 +978,14 @@ export function werewolfVote(roomCode, socketId, targetName) {
 
     room.werewolfVotes[werewolf.name] = targetName;
 
+    // Private confirmation to the acting werewolf (only they may know the
+    // mark they just placed). Emitted before resolution so ordering is stable.
+    io.to(werewolf.socketId).emit("gameEvent", {
+        kind: "victimMarked",
+        player: targetName,
+        message: "You have marked tonight's victim.",
+    });
+
     if (haveAllLivingNightRolesActed(room)) {
         resolveNightActions(roomCode);
     }
@@ -982,6 +1034,12 @@ export function knightProtect(roomCode, socketId, targetName) {
     if (!validation.success) return validation;
 
     room.knightAction = targetName;
+
+    io.to(knight.socketId).emit("gameEvent", {
+        kind: "protectionSet",
+        player: targetName,
+        message: "You will shield them tonight.",
+    });
 
     if (haveAllLivingNightRolesActed(room)) {
         resolveNightActions(roomCode);
@@ -1151,7 +1209,10 @@ export function removeDisconnectedPlayer(roomCode, socketId, playerId = null) {
         player.alive = false;
         console.log(`[PLAYER] ELIMINATED_BY_TIMEOUT room=${roomCode} player=${removedPlayerName}`);
 
-        io.to(roomCode).emit("playerLeft", getPublicPlayers(room));
+        io.to(roomCode).emit("playerLeft", {
+            player: removedPlayerName,
+            players: getPublicPlayers(room),
+        });
 
         if (wasHost) {
             transferHost(roomCode, room);
@@ -1175,7 +1236,10 @@ export function removeDisconnectedPlayer(roomCode, socketId, playerId = null) {
         transferHost(roomCode, room);
     }
 
-    io.to(roomCode).emit("playerLeft", getPublicPlayers(room));
+    io.to(roomCode).emit("playerLeft", {
+        player: removedPlayerName,
+        players: getPublicPlayers(room),
+    });
 
     const { activePlayers, disconnectedPlayers, totalPlayers } = getRoomOccupancy(room);
     console.log(
@@ -1329,7 +1393,10 @@ export function leaveRoom(roomCode, playerName, socketId = null, playerId = null
             transferHost(roomCode, room);
         }
 
-        io.to(roomCode).emit("playerLeft", getPublicPlayers(room));
+        io.to(roomCode).emit("playerLeft", {
+            player: player.name,
+            players: getPublicPlayers(room),
+        });
 
         // Leaving during night/voting may advance the phase if all remaining
         // connected players have acted.
@@ -1359,5 +1426,8 @@ export function leaveRoom(roomCode, playerName, socketId = null, playerId = null
         io.to(roomCode).emit("hostChanged", { host: room.host });
     }
 
-    io.to(roomCode).emit("playerLeft", getPublicPlayers(room));
+    io.to(roomCode).emit("playerLeft", {
+        player: player.name,
+        players: getPublicPlayers(room),
+    });
 }

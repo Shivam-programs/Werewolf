@@ -11,7 +11,7 @@ import { RoleReveal } from "../../components/game/RoleReveal";
 import { GameOver } from "../../components/game/GameOver";
 import { PhaseTransition } from "../../components/game/PhaseTransition";
 import { GameStartOverlay } from "../../components/game/GameStartOverlay";
-import { GameEvent } from "../../components/game/GameEvent";
+import { GameEventOverlay } from "../../components/game/GameEvent";
 import { Countdown } from "../../components/ui/Countdown";
 import { useGameSounds } from "../../hooks/useGameSounds";
 
@@ -131,11 +131,15 @@ export default function Game() {
     roleRevealId,
     werewolfTeammates,
     gameResult,
-    gameEvent,
+    eventQueue,
     playerName,
     leave,
     enterReplayQueue,
   } = useGameStore();
+
+  // While a major event is on screen, hold back the phase announcement so the
+  // two centre-screen overlays never compete for attention.
+  const hasPendingEvent = eventQueue.length > 0;
 
   // Play phase sounds
   useEffect(() => {
@@ -184,7 +188,7 @@ export default function Game() {
   return (
     <main className="game-shell" data-phase={phase}>
       <ConnectionBanner />
-      <PhaseTransition phase={phase} />
+      <PhaseTransition phase={phase} suspended={hasPendingEvent} />
       <GameStartOverlay phase={phase} />
 
       <div className="mx-auto max-w-[1600px] px-4 py-4 pb-20 sm:px-6 sm:py-6 xl:pb-6">
@@ -292,8 +296,8 @@ export default function Game() {
       {/* Mobile tab bar */}
       <MobileTabBar active={mobileTab} onChange={setMobileTab} />
 
-      {/* Center-screen game event overlay (eliminations, protections) */}
-      <GameEvent event={gameEvent} />
+      {/* Prioritised major game event notification centre */}
+      <GameEventOverlay />
 
       {/* Role reveal overlay */}
       {ownRole && (
