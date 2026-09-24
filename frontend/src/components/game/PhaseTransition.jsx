@@ -30,8 +30,7 @@ export function PhaseTransition({ phase, suspended = false }) {
 
   useEffect(() => {
     if (!phases[phase]) return undefined;
-    // Wait for a major game event to clear before announcing the new phase so
-    // the two centre-screen overlays are shown one after another, never at once.
+
     if (suspended) return undefined;
     const timer = window.setTimeout(() => setDismissedPhase(phase), 1800);
     return () => window.clearTimeout(timer);
@@ -54,7 +53,12 @@ export function PhaseTransition({ phase, suspended = false }) {
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.15, type: "spring", stiffness: 200, damping: 15 }}
+              transition={{
+                delay: 0.15,
+                type: "spring",
+                stiffness: 200,
+                damping: 15,
+              }}
               className="phase-overlay__icon"
             >
               <span className={info.glow}>{info.icon}</span>

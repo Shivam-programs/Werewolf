@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const CIRCUMFERENCE = 2 * Math.PI * 30; // r=30
+const CIRCUMFERENCE = 2 * Math.PI * 30; 
 
 export function Countdown({ endsAt, totalDuration }) {
   const [remaining, setRemaining] = useState(() =>
@@ -12,7 +12,7 @@ export function Countdown({ endsAt, totalDuration }) {
     const update = () =>
       setRemaining(Math.max(0, Number(endsAt) - Date.now()));
     update();
-    const timer = window.setInterval(update, 250); // smoother ring
+    const timer = window.setInterval(update, 250); 
     return () => window.clearInterval(timer);
   }, [endsAt]);
 
@@ -25,7 +25,7 @@ export function Countdown({ endsAt, totalDuration }) {
   const fraction = Math.min(remaining / totalMs, 1);
   const offset = CIRCUMFERENCE * (1 - fraction);
 
-  // Urgency tier
+  
   const urgency =
     seconds > 30
       ? "calm"

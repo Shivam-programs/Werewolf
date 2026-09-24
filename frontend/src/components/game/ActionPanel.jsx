@@ -38,7 +38,6 @@ const votingCopy = {
   accent: "border-amber-300 bg-amber-300/10 text-amber-100",
 };
 
-// Passive states — when the player can't act
 function PassiveState({ icon, title, text }) {
   return (
     <div className="action-copy">
@@ -74,8 +73,7 @@ export function ActionPanel() {
   const eligibleTargets =
     phase === "night" && ownRole === "Werewolf"
       ? alivePlayers.filter(
-          (p) =>
-            p.name !== playerName && !werewolfTeammates.includes(p.name),
+          (p) => p.name !== playerName && !werewolfTeammates.includes(p.name),
         )
       : phase === "night" && ownRole === "Knight"
         ? alivePlayers
@@ -85,12 +83,9 @@ export function ActionPanel() {
     ? selected
     : "";
 
-  // Determine the active action config
-  const actionConfig =
-    phase === "voting" ? votingCopy : copy[ownRole] || null;
+  const actionConfig = phase === "voting" ? votingCopy : copy[ownRole] || null;
   const submitted = phase === "voting" ? voteSubmitted : actionSubmitted;
 
-  // === PASSIVE STATES ===
   if (phase === "day")
     return (
       <PassiveState
@@ -124,7 +119,6 @@ export function ActionPanel() {
       />
     );
 
-  // === ACTIVE STATE ===
   const submit = () => {
     if (!selectedTarget) return toast.error("Choose a player first.");
 
@@ -172,7 +166,7 @@ export function ActionPanel() {
         )}
       </div>
 
-      {/* Target grid */}
+      {}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {eligibleTargets.map((player) => {
           const playerNumber =

@@ -15,7 +15,6 @@ import { GameEventOverlay } from "../../components/game/GameEvent";
 import { Countdown } from "../../components/ui/Countdown";
 import { useGameSounds } from "../../hooks/useGameSounds";
 
-// Phase metadata
 const PHASE_DURATION = { night: 60_000, day: 60_000, voting: 30_000 };
 
 const phaseLabels = {
@@ -33,9 +32,6 @@ const roleIcons = {
   Villager: "🏘️",
 };
 
-// ---------------------------------------------------------------------------
-// Connection status banner — enhanced with reconnect success flash
-// ---------------------------------------------------------------------------
 function ConnectionBanner() {
   const status = useGameStore((s) => s.connectionStatus);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -83,9 +79,6 @@ function ConnectionBanner() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Mobile tab bar — switches between Players, Game, and Chat on small screens
-// ---------------------------------------------------------------------------
 const mobileTabs = [
   { key: "players", label: "Players", icon: "👥" },
   { key: "game", label: "Game", icon: "⚔" },
@@ -100,9 +93,7 @@ function MobileTabBar({ active, onChange }) {
           key={tab.key}
           onClick={() => onChange(tab.key)}
           className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold transition ${
-            active === tab.key
-              ? "text-amber-200"
-              : "text-zinc-500"
+            active === tab.key ? "text-amber-200" : "text-zinc-500"
           }`}
         >
           <span className="text-base">{tab.icon}</span>
@@ -113,9 +104,6 @@ function MobileTabBar({ active, onChange }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Game page
-// ---------------------------------------------------------------------------
 export default function Game() {
   const navigate = useNavigate();
   const { play, enable, disable } = useGameSounds();
@@ -137,11 +125,8 @@ export default function Game() {
     enterReplayQueue,
   } = useGameStore();
 
-  // While a major event is on screen, hold back the phase announcement so the
-  // two centre-screen overlays never compete for attention.
   const hasPendingEvent = eventQueue.length > 0;
 
-  // Play phase sounds
   useEffect(() => {
     if (["night", "day", "voting"].includes(phase)) play(phase);
   }, [phase, play]);
@@ -165,7 +150,9 @@ export default function Game() {
     if (joiningNextRound) return;
     if (!socket.connected) {
       ensureSocket();
-      toast.error("Reconnecting to the game server. Please try again in a moment.");
+      toast.error(
+        "Reconnecting to the game server. Please try again in a moment.",
+      );
       return;
     }
     setJoiningNextRound(true);
@@ -192,7 +179,7 @@ export default function Game() {
       <GameStartOverlay phase={phase} />
 
       <div className="mx-auto max-w-[1600px] px-4 py-4 pb-20 sm:px-6 sm:py-6 xl:pb-6">
-        {/* Header */}
+        {}
         <header className="mb-4 flex items-center justify-between gap-3">
           <div>
             <p className="font-display text-xl text-zinc-100 sm:text-2xl">
@@ -203,24 +190,26 @@ export default function Game() {
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Sound toggle */}
+            {}
             <button
               type="button"
               onClick={toggleSound}
               aria-pressed={!soundEnabled}
-              aria-label={soundEnabled ? "Mute game sounds" : "Enable game sounds"}
+              aria-label={
+                soundEnabled ? "Mute game sounds" : "Enable game sounds"
+              }
               title={soundEnabled ? "Mute sounds" : "Enable sounds"}
               className="rounded-lg border border-white/10 bg-white/[.03] px-2 py-1.5 text-xs font-bold text-zinc-200 transition hover:border-amber-200/40 hover:bg-white/[.07]"
             >
               {soundEnabled ? "🔊" : "🔇"}
             </button>
 
-            {/* Player name */}
+            {}
             <span className="hidden text-xs text-zinc-500 sm:inline">
               You are <b className="text-zinc-200">{playerName}</b>
             </span>
 
-            {/* Role badge */}
+            {}
             {ownRole && (
               <span
                 className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold sm:px-3 sm:py-1.5 ${
@@ -240,17 +229,17 @@ export default function Game() {
           </div>
         </header>
 
-        {/* Desktop: 3-column layout | Mobile: tab-switched */}
+        {}
         <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-          {/* Players — hidden on mobile unless tab active */}
+          {}
           <div className={mobileTab !== "players" ? "hidden xl:block" : ""}>
             <PlayerList />
           </div>
 
-          {/* Center column — always shown on desktop, tab-switched on mobile */}
+          {}
           <div className={mobileTab !== "game" ? "hidden xl:block" : ""}>
             <section className="min-w-0 space-y-4">
-              {/* Phase card */}
+              {}
               <motion.section
                 key={phase}
                 initial={{ opacity: 0.5, y: 6 }}
@@ -272,7 +261,9 @@ export default function Game() {
                         <span className="text-zinc-500"> · {day}</span>
                       )}
                     </h1>
-                    <p className="mt-2 text-sm text-zinc-300 sm:mt-3">{description}</p>
+                    <p className="mt-2 text-sm text-zinc-300 sm:mt-3">
+                      {description}
+                    </p>
                   </div>
                   <Countdown
                     endsAt={phaseEndTime}
@@ -281,25 +272,25 @@ export default function Game() {
                 </div>
               </motion.section>
 
-              {/* Action panel */}
+              {}
               <ActionPanel />
             </section>
           </div>
 
-          {/* Chat — hidden on mobile unless tab active */}
+          {}
           <div className={mobileTab !== "chat" ? "hidden xl:block" : ""}>
             <ChatPanel />
           </div>
         </div>
       </div>
 
-      {/* Mobile tab bar */}
+      {}
       <MobileTabBar active={mobileTab} onChange={setMobileTab} />
 
-      {/* Prioritised major game event notification centre */}
+      {}
       <GameEventOverlay />
 
-      {/* Role reveal overlay */}
+      {}
       {ownRole && (
         <RoleReveal
           key={roleRevealId}
@@ -308,7 +299,7 @@ export default function Game() {
         />
       )}
 
-      {/* Game over overlay */}
+      {}
       <GameOver
         result={gameResult}
         onPlayAgain={playAgain}

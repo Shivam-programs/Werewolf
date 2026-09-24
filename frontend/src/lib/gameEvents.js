@@ -1,17 +1,3 @@
-/**
- * Central catalog for major game events.
- *
- * Every event has a stable identity so the notification can be rendered
- * consistently and, later, paired with a sound without touching call sites.
- *
- * priority:
- *   "medium"   → prominent top banner (never blocks the board)
- *   "high"     → centre-screen event, dimmed backdrop
- *   "critical" → full dramatic centre-screen event
- *
- * Normal notifications (joins, reconnects, "vote recorded", …) deliberately
- * stay as react-hot-toast and never enter this queue.
- */
 export const EVENT_KINDS = {
   eliminated: {
     icon: "☠",
@@ -82,11 +68,10 @@ export const PRIORITY_RANK = { medium: 1, high: 2, critical: 3 };
 
 let sequence = 0;
 
-/**
- * Build a queue-ready event from a kind plus optional server payload.
- * Returns null for unknown kinds so handlers can safely forward untrusted data.
- */
-export function buildGameEvent(kind, { player = null, message = "", tone, priority } = {}) {
+export function buildGameEvent(
+  kind,
+  { player = null, message = "", tone, priority } = {},
+) {
   const base = EVENT_KINDS[kind];
   if (!base) return null;
 

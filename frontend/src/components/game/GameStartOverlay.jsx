@@ -1,17 +1,12 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
-/**
- * Shown once when the game transitions from waiting → first night.
- * Displays a brief atmospheric countdown before the role reveal appears.
- */
 export function GameStartOverlay({ phase }) {
   const [show, setShow] = useState(false);
   const [count, setCount] = useState(3);
   const hasStartedRef = useRef(false);
 
   useEffect(() => {
-    // Only trigger on the first transition to night (game start)
     if (phase === "night" && !hasStartedRef.current) {
       hasStartedRef.current = true;
       setShow(true);

@@ -3,9 +3,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../../store/gameStore";
 import { socket } from "../../services/socket";
 
-// ---------------------------------------------------------------------------
-// System message divider — styled differently from player messages
-// ---------------------------------------------------------------------------
 function SystemDivider({ message }) {
   return (
     <motion.div
@@ -24,9 +21,6 @@ function SystemDivider({ message }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Player message bubble
-// ---------------------------------------------------------------------------
 function MessageBubble({ message, isOwn, accent }) {
   return (
     <motion.div
@@ -51,9 +45,6 @@ function MessageBubble({ message, isOwn, accent }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Feed — renders messages with auto-scroll and new-message indicator
-// ---------------------------------------------------------------------------
 function Feed({ messages, accent, playerName }) {
   const feedRef = useRef(null);
   const endRef = useRef(null);
@@ -61,7 +52,6 @@ function Feed({ messages, accent, playerName }) {
   const [isNearBottom, setIsNearBottom] = useState(true);
   const showNew = !isNearBottom && messages.length > readMessageCount;
 
-  // Auto-scroll if near bottom
   useEffect(() => {
     const el = feedRef.current;
     if (!el) return;
@@ -86,7 +76,8 @@ function Feed({ messages, accent, playerName }) {
         onScroll={() => {
           const el = feedRef.current;
           if (!el) return;
-          const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+          const nearBottom =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 40;
           setIsNearBottom(nearBottom);
           if (nearBottom) setReadMessageCount(messages.length);
         }}
@@ -117,7 +108,7 @@ function Feed({ messages, accent, playerName }) {
         <div ref={endRef} />
       </div>
 
-      {/* New message indicator */}
+      {}
       <AnimatePresence>
         {showNew && (
           <motion.button
@@ -135,9 +126,6 @@ function Feed({ messages, accent, playerName }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Chat panel
-// ---------------------------------------------------------------------------
 export function ChatPanel() {
   const { roomCode, playerName, ownRole, messages, werewolfMessages } =
     useGameStore();
@@ -159,7 +147,7 @@ export function ChatPanel() {
 
   return (
     <section className="panel flex h-120 max-h-[calc(100vh-2rem)] flex-col p-4 sm:p-5 xl:sticky xl:top-4">
-      {/* Tab bar */}
+      {}
       <div className="mb-4 flex items-center gap-1 border-b border-white/7 pb-3">
         <button
           onClick={() => setTab("public")}
@@ -185,14 +173,14 @@ export function ChatPanel() {
         )}
       </div>
 
-      {/* Feed */}
+      {}
       <Feed
         messages={privateActive ? werewolfMessages : messages}
         accent={privateActive ? "text-rose-300" : "text-amber-200"}
         playerName={playerName}
       />
 
-      {/* Input */}
+      {}
       <form onSubmit={send} className="mt-4 flex gap-2">
         <input
           value={text}

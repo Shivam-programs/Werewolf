@@ -83,25 +83,29 @@ export function RoleReveal({ role, Teammates }) {
             exit={{ opacity: 0, scale: 0.95 }}
             className={`w-full max-w-md overflow-hidden rounded-3xl border ${info.border} bg-gradient-to-br ${info.tone} ${info.glow} p-8 text-center sm:p-10`}
           >
-            {/* Icon */}
+            {}
             <motion.div
               variants={fadeUp}
               className={`mx-auto mb-5 grid h-24 w-24 place-items-center rounded-2xl ${info.iconBg} text-5xl`}
             >
               <motion.span
                 animate={{ rotate: [0, 6, -6, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
               >
                 {info.icon}
               </motion.span>
             </motion.div>
 
-            {/* Eyebrow */}
+            {}
             <motion.p variants={fadeUp} className="eyebrow">
               The veil has lifted
             </motion.p>
 
-            {/* Title */}
+            {}
             <motion.h2
               variants={fadeUp}
               className="font-display mt-2 text-4xl text-zinc-50 sm:text-5xl"
@@ -109,7 +113,7 @@ export function RoleReveal({ role, Teammates }) {
               {info.heading}
             </motion.h2>
 
-            {/* Description */}
+            {}
             <motion.p
               variants={fadeUp}
               className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-zinc-300"
@@ -117,7 +121,7 @@ export function RoleReveal({ role, Teammates }) {
               {info.text}
             </motion.p>
 
-            {/* Objective */}
+            {}
             <motion.div
               variants={fadeUp}
               className="mx-auto mt-5 max-w-xs rounded-xl border border-white/8 bg-black/20 px-4 py-3"
@@ -130,7 +134,7 @@ export function RoleReveal({ role, Teammates }) {
               </p>
             </motion.div>
 
-            {/* Teammates (Werewolf only) */}
+            {}
             {Teammates && Teammates.length > 0 && (
               <motion.div
                 variants={fadeUp}
@@ -145,7 +149,7 @@ export function RoleReveal({ role, Teammates }) {
               </motion.div>
             )}
 
-            {/* Button */}
+            {}
             <motion.button
               variants={fadeUp}
               onClick={() => setOpen(false)}

@@ -14,7 +14,12 @@ const cardVariant = {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { delay: 0.8 + i * 0.08, type: "spring", stiffness: 260, damping: 22 },
+    transition: {
+      delay: 0.8 + i * 0.08,
+      type: "spring",
+      stiffness: 260,
+      damping: 22,
+    },
   }),
 };
 
@@ -37,7 +42,7 @@ export function GameOver({ result, onPlayAgain, joiningNextRound, onHome }) {
             transition={{ type: "spring", stiffness: 200, damping: 20 }}
             className="w-full max-w-2xl"
           >
-            {/* Winner Banner */}
+            {}
             <div
               className={`rounded-t-3xl border border-b-0 p-8 text-center sm:p-10 ${
                 isWolves
@@ -83,7 +88,7 @@ export function GameOver({ result, onPlayAgain, joiningNextRound, onHome }) {
               </motion.p>
             </div>
 
-            {/* Player Results */}
+            {}
             <div className="rounded-b-3xl border border-white/8 bg-zinc-950/80 p-6 sm:p-8">
               <p className="mb-4 text-center text-[10px] font-bold uppercase tracking-[.2em] text-zinc-500">
                 All roles revealed
@@ -110,7 +115,7 @@ export function GameOver({ result, onPlayAgain, joiningNextRound, onHome }) {
                           : "border-white/5 bg-white/[.02]"
                       }`}
                     >
-                      {/* Winner indicator */}
+                      {}
                       {isWinner && (
                         <div
                           className={`absolute right-2 top-2 text-[10px] font-bold ${
@@ -125,7 +130,9 @@ export function GameOver({ result, onPlayAgain, joiningNextRound, onHome }) {
                       </div>
                       <p
                         className={`truncate text-sm font-bold ${
-                          isDead ? "text-zinc-500 line-through" : "text-zinc-200"
+                          isDead
+                            ? "text-zinc-500 line-through"
+                            : "text-zinc-200"
                         }`}
                       >
                         {player.name}
@@ -149,7 +156,7 @@ export function GameOver({ result, onPlayAgain, joiningNextRound, onHome }) {
                 })}
               </div>
 
-              {/* Actions */}
+              {}
               <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
                 <Button
                   onClick={onPlayAgain}

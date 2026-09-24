@@ -60,7 +60,7 @@ export default function Home() {
       <div className="mist mist-two" />
 
       <section className="relative z-10 mx-auto grid min-h-screen max-w-6xl items-center gap-12 px-5 py-12 lg:grid-cols-[1.15fr_.85fr] lg:px-8">
-        {/* Hero */}
+        {}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -73,16 +73,14 @@ export default function Home() {
           <h1 className="font-display mt-3 text-6xl leading-[.85] text-zinc-50 sm:text-8xl">
             WERE
             <br />
-            <span className="text-amber-200">
-              &nbsp;&nbsp;&nbsp; WOLF
-            </span>
+            <span className="text-amber-200">&nbsp;&nbsp;&nbsp; WOLF</span>
           </h1>
           <p className="mt-7 max-w-lg text-base leading-relaxed text-zinc-400 sm:text-lg">
             The village sleeps lightly. Gather seven souls, hide your loyalties,
             and find the wolves before the moon claims everyone.
           </p>
 
-          {/* Role preview cards */}
+          {}
           <div className="mt-8 flex flex-wrap gap-3">
             {roleCards.map((role) => (
               <motion.div
@@ -98,7 +96,7 @@ export default function Home() {
           </div>
         </motion.div>
 
-        {/* Form panel */}
+        {}
         <motion.section
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -112,7 +110,7 @@ export default function Home() {
               Find your village
             </h2>
 
-            {/* Mode tabs */}
+            {}
             <div className="mt-6 grid grid-cols-2 rounded-xl bg-black/20 p-1">
               <button
                 onClick={() => setMode("create")}
@@ -158,9 +156,7 @@ export default function Home() {
                     }
                     value={roomCode}
                     maxLength={6}
-                    onChange={(e) =>
-                      setRoomCode(e.target.value.toUpperCase())
-                    }
+                    onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                     placeholder={
                       mode === "create" ? "Generated for you" : "e.g. M0ON7"
                     }
@@ -168,9 +164,7 @@ export default function Home() {
                 </motion.div>
               </AnimatePresence>
               <Button type="submit" loading={loading} className="mt-2 w-full">
-                {mode === "create"
-                  ? "Create the village"
-                  : "Join the village"}{" "}
+                {mode === "create" ? "Create the village" : "Join the village"}{" "}
                 <span>→</span>
               </Button>
             </form>

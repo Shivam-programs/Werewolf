@@ -46,15 +46,15 @@ export function PlayerList({ waiting = false }) {
   } = useGameStore();
 
   const isInGame = phase !== "waiting" && phase !== "ended";
-  // Roles are only ever public during an active game (fallen players) or on the
-  // results screen — never while the village is gathering for a new round.
+  
+  
   const showRoles = phase !== "waiting";
   const visiblePlayers = isInGame
     ? players
     : players.filter((p) => p.connected !== false && !p.afk);
   const alivePlayers = visiblePlayers.filter((p) => p.alive !== false);
 
-  // Fade the elimination emphasis shortly after the event has played.
+  
   useEffect(() => {
     if (!highlightedPlayer) return undefined;
     const timer = window.setTimeout(() => setHighlightedPlayer(null), 2600);
@@ -63,7 +63,7 @@ export function PlayerList({ waiting = false }) {
 
   return (
     <section className="panel flex min-h-0 flex-col p-4 sm:p-5">
-      {/* Header */}
+      {}
       <div className="mb-4 flex items-center justify-between">
         <div>
           <p className="eyebrow">The village</p>
@@ -79,7 +79,7 @@ export function PlayerList({ waiting = false }) {
         </span>
       </div>
 
-      {/* Player list */}
+      {}
       <div className="thin-scroll space-y-2 overflow-auto pr-1">
         <AnimatePresence mode="popLayout">
           {visiblePlayers.map((player, index) => {
@@ -120,7 +120,7 @@ export function PlayerList({ waiting = false }) {
                   isHighlighted ? "ring-2 ring-rose-400/70" : ""
                 }`}
               >
-                {/* Avatar */}
+                {}
                 <div className="relative flex-shrink-0">
                   <span
                     className={`grid h-9 w-9 place-items-center rounded-full text-sm font-black ${
@@ -129,7 +129,7 @@ export function PlayerList({ waiting = false }) {
                   >
                     {isDead ? "✕" : initial}
                   </span>
-                  {/* Status dot */}
+                  {}
                   <span className="absolute -bottom-0.5 -right-0.5">
                     <StatusDot
                       alive={player.alive}
@@ -139,7 +139,7 @@ export function PlayerList({ waiting = false }) {
                   </span>
                 </div>
 
-                {/* Info */}
+                {}
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-zinc-200">
                     <span className="truncate">{player.name}</span>
@@ -171,7 +171,7 @@ export function PlayerList({ waiting = false }) {
                   </p>
                 </div>
 
-                {/* Host crown (in game) */}
+                {}
                 {isHost && !waiting && (
                   <span
                     title="Host"
@@ -185,7 +185,7 @@ export function PlayerList({ waiting = false }) {
           })}
         </AnimatePresence>
 
-        {/* Empty slots */}
+        {}
         {Array.from({ length: Math.max(0, 7 - visiblePlayers.length) }).map(
           (_, i) => (
             <div

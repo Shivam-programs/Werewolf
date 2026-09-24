@@ -4,30 +4,37 @@
   --font-display: Georgia, "Times New Roman", serif;
 }
 
-/* ================================================================
-   DESIGN TOKENS
-   ================================================================ */
 :root {
   color: #f4f4f5;
   background: #09080d;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 
-  /* Phase-dynamic colors — updated by JS via data-phase on .game-shell */
-  --phase-accent: 43 96% 56%;     /* amber default */
+  --phase-accent: 43 96% 56%;
   --phase-glow: 43 96% 56%;
   --phase-bg-from: rgba(165, 96, 38, 0.12);
   --phase-bg-to: rgba(74, 34, 78, 0.18);
 }
 
-* { box-sizing: border-box; }
-html { background: #09080d; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: #09080d; }
-button, input { font: inherit; }
-button { cursor: pointer; }
+* {
+  box-sizing: border-box;
+}
+html {
+  background: #09080d;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #09080d;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
 
-/* ================================================================
-   TYPOGRAPHY
-   ================================================================ */
 .font-display {
   font-family: var(--font-display);
   letter-spacing: -0.035em;
@@ -40,21 +47,29 @@ button { cursor: pointer; }
   text-transform: uppercase;
 }
 
-/* ================================================================
-   SCROLLBAR
-   ================================================================ */
-.chat-feed { -ms-overflow-style: none; scrollbar-width: none; }
-.chat-feed::-webkit-scrollbar { display: none; }
+.chat-feed {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.chat-feed::-webkit-scrollbar {
+  display: none;
+}
 
-/* Thin scrollbar for player list and overflow areas */
-.thin-scroll::-webkit-scrollbar { width: 4px; }
-.thin-scroll::-webkit-scrollbar-track { background: transparent; }
-.thin-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-.thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
+.thin-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
 
-/* ================================================================
-   BACKGROUNDS & SHELLS
-   ================================================================ */
 .home-shell,
 .game-shell {
   min-height: 100vh;
@@ -64,9 +79,10 @@ button { cursor: pointer; }
     #09080d;
   transition: background 1.2s ease;
 }
-.home-shell { overflow: hidden; }
+.home-shell {
+  overflow: hidden;
+}
 
-/* Phase-specific background shifts */
 .game-shell[data-phase="night"] {
   --phase-accent: 260 60% 55%;
   --phase-glow: 270 65% 50%;
@@ -92,9 +108,6 @@ button { cursor: pointer; }
   --phase-bg-to: rgba(74, 34, 78, 0.18);
 }
 
-/* ================================================================
-   MIST — ANIMATED
-   ================================================================ */
 .mist {
   position: fixed;
   pointer-events: none;
@@ -119,13 +132,14 @@ button { cursor: pointer; }
   animation: mist-drift 22s ease-in-out infinite alternate-reverse;
 }
 @keyframes mist-drift {
-  0%   { transform: translateX(0) rotate(-20deg); }
-  100% { transform: translateX(30px) rotate(-15deg); }
+  0% {
+    transform: translateX(0) rotate(-20deg);
+  }
+  100% {
+    transform: translateX(30px) rotate(-15deg);
+  }
 }
 
-/* ================================================================
-   PANELS
-   ================================================================ */
 .panel {
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 1.25rem;
@@ -134,18 +148,19 @@ button { cursor: pointer; }
   backdrop-filter: blur(18px);
 }
 
-/* ================================================================
-   PHASE CARDS
-   ================================================================ */
 .phase-card {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1.25rem;
-  background: linear-gradient(120deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.015)
+  );
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
 }
-/* Shimmer overlay */
+
 .phase-card::after {
   content: "";
   position: absolute;
@@ -153,33 +168,47 @@ button { cursor: pointer; }
   background: linear-gradient(
     105deg,
     transparent 40%,
-    rgba(255,255,255,0.03) 50%,
+    rgba(255, 255, 255, 0.03) 50%,
     transparent 60%
   );
   animation: shimmer 6s ease-in-out infinite;
   pointer-events: none;
 }
 @keyframes shimmer {
-  0%, 100% { transform: translateX(-100%); }
-  50%      { transform: translateX(100%); }
+  0%,
+  100% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
 }
 
 .phase-night {
-  background: linear-gradient(120deg, rgba(77, 54, 110, 0.32), rgba(15, 14, 25, 0.65));
+  background: linear-gradient(
+    120deg,
+    rgba(77, 54, 110, 0.32),
+    rgba(15, 14, 25, 0.65)
+  );
   border-color: rgba(120, 80, 180, 0.15);
 }
 .phase-day {
-  background: linear-gradient(120deg, rgba(128, 89, 37, 0.25), rgba(20, 18, 19, 0.72));
+  background: linear-gradient(
+    120deg,
+    rgba(128, 89, 37, 0.25),
+    rgba(20, 18, 19, 0.72)
+  );
   border-color: rgba(180, 140, 60, 0.12);
 }
 .phase-voting {
-  background: linear-gradient(120deg, rgba(111, 45, 45, 0.26), rgba(24, 16, 18, 0.72));
+  background: linear-gradient(
+    120deg,
+    rgba(111, 45, 45, 0.26),
+    rgba(24, 16, 18, 0.72)
+  );
   border-color: rgba(180, 60, 60, 0.12);
 }
 
-/* ================================================================
-   ACTION COPY (passive action states)
-   ================================================================ */
 .action-copy {
   display: flex;
   align-items: center;
@@ -203,9 +232,6 @@ button { cursor: pointer; }
   font-size: 1.4rem;
 }
 
-/* ================================================================
-   STATUS INDICATORS
-   ================================================================ */
 .status-dot {
   width: 8px;
   height: 8px;
@@ -225,13 +251,17 @@ button { cursor: pointer; }
   animation: pulse-dot 1s ease-in-out infinite;
 }
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.5; transform: scale(0.8); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
 }
 
-/* ================================================================
-   COUNTDOWN RING
-   ================================================================ */
 .countdown-ring {
   --size: 72px;
   --stroke: 3.5;
@@ -246,14 +276,16 @@ button { cursor: pointer; }
 }
 .countdown-ring__track {
   fill: none;
-  stroke: rgba(255,255,255,0.06);
+  stroke: rgba(255, 255, 255, 0.06);
   stroke-width: var(--stroke);
 }
 .countdown-ring__progress {
   fill: none;
   stroke-width: var(--stroke);
   stroke-linecap: round;
-  transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
+  transition:
+    stroke-dashoffset 1s linear,
+    stroke 0.5s ease;
 }
 .countdown-ring__text {
   position: absolute;
@@ -265,26 +297,31 @@ button { cursor: pointer; }
   line-height: 1;
 }
 
-/* Urgency colors */
-.countdown--calm .countdown-ring__progress { stroke: #fbbf24; }
-.countdown--attention .countdown-ring__progress { stroke: #f59e0b; }
+.countdown--calm .countdown-ring__progress {
+  stroke: #fbbf24;
+}
+.countdown--attention .countdown-ring__progress {
+  stroke: #f59e0b;
+}
 .countdown--urgent .countdown-ring__progress {
   stroke: #ef4444;
-  filter: drop-shadow(0 0 4px rgba(239,68,68,0.4));
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.4));
 }
 .countdown--critical .countdown-ring__progress {
   stroke: #ef4444;
-  filter: drop-shadow(0 0 8px rgba(239,68,68,0.6));
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
   animation: ring-pulse 0.6s ease-in-out infinite;
 }
 @keyframes ring-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
-/* ================================================================
-   PHASE TRANSITION OVERLAY
-   ================================================================ */
 .phase-overlay {
   position: fixed;
   inset: 0;
@@ -311,60 +348,74 @@ button { cursor: pointer; }
   text-align: center;
 }
 
-/* ================================================================
-   FOCUS & ACCESSIBILITY
-   ================================================================ */
 :focus-visible {
   outline: 2px solid hsl(var(--phase-accent) / 0.7);
   outline-offset: 2px;
 }
 
-/* ================================================================
-   RESPONSIVE
-   ================================================================ */
 @media (max-width: 1279px) {
-  .game-shell .panel { min-height: auto; }
-  /* Chat height on mobile — shorter to fit */
-  .game-shell .panel.h-120 { height: auto; max-height: 60vh; }
+  .game-shell .panel {
+    min-height: auto;
+  }
+
+  .game-shell .panel.h-120 {
+    height: auto;
+    max-height: 60vh;
+  }
 }
 @media (max-width: 640px) {
-  .countdown-ring { --size: 56px; --stroke: 3; }
+  .countdown-ring {
+    --size: 56px;
+    --stroke: 3;
+  }
 }
 
-/* ================================================================
-   AMBIENT PARTICLES — subtle floating dots on home page
-   ================================================================ */
 .home-shell::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(1px 1px at 20% 30%, rgba(252,211,77,0.15), transparent),
-    radial-gradient(1px 1px at 80% 20%, rgba(252,211,77,0.1), transparent),
-    radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,0.08), transparent),
-    radial-gradient(1px 1px at 65% 55%, rgba(252,211,77,0.12), transparent),
-    radial-gradient(1px 1px at 10% 85%, rgba(255,255,255,0.06), transparent),
-    radial-gradient(1px 1px at 90% 75%, rgba(252,211,77,0.08), transparent);
-  background-size: 180px 180px, 220px 220px, 150px 150px, 200px 200px, 170px 170px, 190px 190px;
+    radial-gradient(1px 1px at 20% 30%, rgba(252, 211, 77, 0.15), transparent),
+    radial-gradient(1px 1px at 80% 20%, rgba(252, 211, 77, 0.1), transparent),
+    radial-gradient(1px 1px at 40% 70%, rgba(255, 255, 255, 0.08), transparent),
+    radial-gradient(1px 1px at 65% 55%, rgba(252, 211, 77, 0.12), transparent),
+    radial-gradient(1px 1px at 10% 85%, rgba(255, 255, 255, 0.06), transparent),
+    radial-gradient(1px 1px at 90% 75%, rgba(252, 211, 77, 0.08), transparent);
+  background-size:
+    180px 180px,
+    220px 220px,
+    150px 150px,
+    200px 200px,
+    170px 170px,
+    190px 190px;
   animation: particle-drift 25s linear infinite;
   z-index: 1;
 }
 @keyframes particle-drift {
-  0%   { transform: translateY(0); }
-  100% { transform: translateY(-180px); }
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-180px);
+  }
 }
 
-/* ================================================================
-   REDUCED MOTION
-   ================================================================ */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  .phase-card::after { animation: none; }
-  .mist { animation: none; }
-  .home-shell::after { animation: none; }
+  .phase-card::after {
+    animation: none;
+  }
+  .mist {
+    animation: none;
+  }
+  .home-shell::after {
+    animation: none;
+  }
 }

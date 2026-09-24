@@ -6,7 +6,8 @@ import { PlayerList } from "../../components/players/PlayerList";
 import { Button } from "../../components/ui/Button";
 
 export default function WaitingRoom({ onLeave }) {
-  const { roomCode, players, playerName, host, connectionStatus } = useGameStore();
+  const { roomCode, players, playerName, host, connectionStatus } =
+    useGameStore();
   const isHost = host === playerName;
   const activePlayers = players.filter((p) => p.connected && !p.afk);
   const ready = activePlayers.length === 7;
@@ -18,7 +19,8 @@ export default function WaitingRoom({ onLeave }) {
   };
   const share = async () => {
     const text = `Join my Werewolf game in Howl & Hollow. Room code: ${roomCode}`;
-    if (navigator.share) await navigator.share({ title: "Howl & Hollow", text });
+    if (navigator.share)
+      await navigator.share({ title: "Howl & Hollow", text });
     else {
       await navigator.clipboard?.writeText(text);
       toast.success("Invite copied.");
@@ -28,7 +30,7 @@ export default function WaitingRoom({ onLeave }) {
 
   return (
     <main className="game-shell">
-      {/* Connection banner */}
+      {}
       {connectionStatus !== "connected" && (
         <div className="flex items-center justify-center gap-2 bg-yellow-500/90 px-4 py-2 text-sm font-bold text-zinc-950">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-950 border-t-transparent" />
@@ -52,7 +54,7 @@ export default function WaitingRoom({ onLeave }) {
           <PlayerList waiting />
 
           <section className="panel flex min-h-120 flex-col justify-center p-6 text-center sm:p-10">
-            {/* Room code */}
+            {}
             <p className="eyebrow">Your invitation</p>
             <motion.p
               initial={{ opacity: 0, scale: 0.9 }}
@@ -66,7 +68,7 @@ export default function WaitingRoom({ onLeave }) {
               when all seven seats are taken.
             </p>
 
-            {/* Buttons */}
+            {}
             <div className="mx-auto mt-6 flex w-full max-w-sm gap-3">
               <Button variant="ghost" onClick={copy} className="flex-1">
                 📋 Copy code
@@ -76,9 +78,9 @@ export default function WaitingRoom({ onLeave }) {
               </Button>
             </div>
 
-            {/* Progress + Start */}
+            {}
             <div className="mt-10 rounded-2xl border border-white/8 bg-black/20 p-5">
-              {/* Progress bar */}
+              {}
               <div className="mx-auto mb-4 h-2 max-w-xs overflow-hidden rounded-full bg-white/5">
                 <motion.div
                   className="h-full rounded-full bg-amber-300"
